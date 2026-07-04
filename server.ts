@@ -185,6 +185,11 @@ app.get("/api/share/verify", async (req, res) => {
 
 // Setup Vite middleware or static serving
 async function setupVite() {
+  if (process.env.VERCEL) {
+    // Vercel serverless functions handle the API routes, while static files are served by the CDN.
+    return;
+  }
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -205,3 +210,5 @@ async function setupVite() {
 }
 
 setupVite();
+
+export default app;
