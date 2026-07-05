@@ -481,15 +481,17 @@ export default function App() {
     addLog("Memulai proses pembuatan token share investor baru...", "info");
     try {
       const data = await apiService.generateShareToken();
-      if (data.status === "success" && data.token) {
-        setGeneratedToken(data.token);
-        addLog(`Tautan investor baru berhasil dibuat: token ${data.token}`, "success");
+      const token = data?.token || data?.data?.token;
+      if (data && data.status === "success" && token) {
+        setGeneratedToken(token);
+        addLog(`Tautan investor baru berhasil dibuat: token ${token}`, "success");
         showSnackbar(`Sukses membuat link share investor baru!`, "success");
         // Reload history
         loadShareTokensHistory();
       } else {
-        addLog(`Gagal membuat tautan share: ${data.message || "Unknown error"}`, "error");
-        showSnackbar(`Gagal membuat link: ${data.message}`, "error");
+        const errorMsg = data?.message || "Format respons tidak dikenal dari Google Sheets";
+        addLog(`Gagal membuat tautan share: ${errorMsg}`, "error");
+        showSnackbar(`Gagal membuat link: ${errorMsg}`, "error");
       }
     } catch (err: any) {
       addLog(`Kesalahan koneksi saat membuat token share: ${err.message}`, "error");
