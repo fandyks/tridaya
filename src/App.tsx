@@ -127,9 +127,14 @@ export default function App() {
   };
 
   // Navigation & UI Layout states
-  const [activeTab, setActiveTab] = useState<"ikhtisar" | "pemasukan" | "pengeluaran" | "mutasi" | "settings" | "share">("ikhtisar");
+  const [activeTab, setActiveTab] = useState<"ikhtisar" | "pemasukan" | "pengeluaran" | "mutasi" | "share">("ikhtisar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
+
+  // Pagination states (10 items per page)
+  const [pemasukanPage, setPemasukanPage] = useState<number>(1);
+  const [pengeluaranPage, setPengeluaranPage] = useState<number>(1);
+  const [investorPage, setInvestorPage] = useState<number>(1);
 
   // Share & Investor states
   const [isInvestorMode, setIsInvestorMode] = useState<boolean>(false);
@@ -176,6 +181,7 @@ export default function App() {
   const [formDari, setFormDari] = useState<string>("");
   const [formKe, setFormKe] = useState<string>("");
   const [formJenis, setFormJenis] = useState<"Deposit" | "Penarikan">("Deposit");
+  const [formPic, setFormPic] = useState<string>("");
 
   // Form states specifically for Pemasukan
   const [formLuasan, setFormLuasan] = useState<number>(0);
@@ -355,6 +361,7 @@ export default function App() {
     const nominal = Number(getVal(["nominal", "Nominal", "jumlah", "Jumlah"], 0));
     const created_by = String(getVal(["created_by", "createdBy", "Created_by", "Created By"], "admin"));
     const created_at = String(getVal(["created_at", "createdAt", "Created_at", "Created At"], new Date().toISOString()));
+    const pic = String(getVal(["pic", "Pic", "PIC"], ""));
 
     return {
       id,
@@ -363,7 +370,8 @@ export default function App() {
       keterangan,
       nominal,
       created_by,
-      created_at
+      created_at,
+      pic
     };
   };
 
@@ -401,6 +409,60 @@ export default function App() {
       created_at,
       created_by
     };
+  };
+
+  // Helper to render pagination
+  const renderPagination = (
+    currentPage: number,
+    totalItems: number,
+    itemsPerPage: number,
+    onPageChange: (page: number) => void
+  ) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 1) return null;
+
+    // Generate page numbers
+    const pages = [];
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i);
+    }
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-800/80 bg-slate-950/40 text-xs">
+        <div className="text-slate-400 font-semibold">
+          Menampilkan <span className="text-white">{(currentPage - 1) * itemsPerPage + 1}</span> - <span className="text-white">{Math.min(currentPage * itemsPerPage, totalItems)}</span> dari <span className="text-white">{totalItems}</span> data
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 border border-slate-800 rounded-lg font-bold text-slate-300 transition duration-150 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Sebelumnya
+          </button>
+          {pages.map((p) => (
+            <button
+              key={p}
+              onClick={() => onPageChange(p)}
+              className={`w-8.5 h-8.5 flex items-center justify-center rounded-lg font-bold border transition duration-150 cursor-pointer ${
+                currentPage === p
+                  ? "bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/20"
+                  : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+          <button
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-30 disabled:hover:bg-slate-900 border border-slate-800 rounded-lg font-bold text-slate-300 transition duration-150 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Selanjutnya
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // Logger helper
@@ -681,6 +743,7 @@ export default function App() {
       const parsedItem = parsePengeluaranItem(item);
       setFormJumlah(parsedItem.nominal);
       setFormKategori(parsedItem.kategori);
+      setFormPic(parsedItem.pic || "");
     }
     setIsModalOpen(true);
   };
@@ -700,6 +763,7 @@ export default function App() {
       setFormDari("Kas Tunai");
       setFormKe("Bank Mandiri");
       setFormJenis("Deposit");
+      setFormPic("");
       setFormLuasan(0);
       setFormPendapatanKotor(0);
       setFormGajiOperator(0);
@@ -778,7 +842,8 @@ export default function App() {
           keterangan: formKeterangan,
           nominal: formJumlah,
           created_by: parsed.created_by || user?.username || "admin",
-          created_at: parsed.created_at || new Date().toISOString()
+          created_at: parsed.created_at || new Date().toISOString(),
+          pic: formPic
         };
         setPengeluaranList(pengeluaranList.map(item => item.id === parsed.id ? updated : item));
         addLog(`Mengubah pengeluaran ID ${parsed.id}...`, "info");
@@ -800,7 +865,8 @@ export default function App() {
           keterangan: formKeterangan,
           nominal: formJumlah,
           created_by: user?.username || "admin",
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          pic: formPic
         };
         setPengeluaranList([...pengeluaranList, newItem]);
         addLog(`Menambah pengeluaran baru...`, "info");
@@ -1042,8 +1108,8 @@ export default function App() {
               </div>
               <div>
                 <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-black block">Portal Investor Tridaya</span>
-                <h1 className="text-2xl font-black tracking-tight text-white mt-0.5">Dasbor Kinerja Keuangan</h1>
-                <p className="text-xs text-slate-500 mt-0.5 font-semibold">Tautan berbagi aman yang diverifikasi langsung dengan Google Sheets.</p>
+                <h1 className="text-2xl font-black tracking-tight text-white mt-0.5">Dasbor Laporan Keuangan</h1>
+                <p className="text-xs text-slate-500 mt-0.5 font-semibold">Realtime Accounting Report</p>
               </div>
             </div>
 
@@ -1054,7 +1120,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-2 bg-slate-900/40 border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400">
                 <Clock className="h-4 w-4 text-indigo-400" />
-                <span className="font-mono">Live UTC: {new Date().toISOString().split("T")[0]}</span>
+                <span className="font-mono">Live: {new Date().toISOString().split("T")[0]}</span>
               </div>
             </div>
           </div>
@@ -1104,7 +1170,7 @@ export default function App() {
                   <div className="space-y-1.5 relative z-10">
                     <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider block">Total Luasan</span>
                     <h3 className="text-2xl font-black font-mono text-indigo-400 tracking-tight">{totalLuasan.toLocaleString("id-ID")} bahu</h3>
-                    <p className="text-[11px] text-slate-400 font-semibold">Total pengerjaan lahan aktif</p>
+                    <p className="text-[11px] text-slate-400 font-semibold">Total pengerjaan lahan</p>
                   </div>
                   <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
                     <Layers3 className="h-5.5 w-5.5" />
@@ -1260,96 +1326,114 @@ export default function App() {
               </div>
 
               {/* Rincian semua transaksi sorted by date */}
-              <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h4 className="text-sm font-black uppercase text-slate-300 tracking-wider">Rincian Riwayat Transaksi</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">Semua catatan pemasukan, pengeluaran, dan mutasi terurut berdasarkan tanggal.</p>
-                  </div>
-                </div>
+              {(() => {
+                const allInvestorTx = [
+                  ...pemasukanList.map(item => ({
+                    id: item.id,
+                    tanggal: item.tanggal,
+                    keterangan: item.keterangan || "Pendapatan Bersih Lahan",
+                    nominal: item.pendapatan_bersih,
+                    tipe: "pemasukan",
+                    detail: `${item.luasan} bahu (Pendapatan Kotor: ${formatIDR(item.pendapatan_kotor)})`
+                  })),
+                  ...pengeluaranList.map(item => {
+                    const parsed = parsePengeluaranItem(item);
+                    return {
+                      id: parsed.id,
+                      tanggal: parsed.tanggal,
+                      keterangan: parsed.keterangan,
+                      nominal: parsed.nominal,
+                      tipe: "pengeluaran",
+                      detail: `Kategori: ${parsed.kategori}${parsed.pic ? ` | PIC: ${parsed.pic}` : ""}`
+                    };
+                  }),
+                  ...mutasiList.map(item => {
+                    const parsed = parseMutasiItem(item);
+                    return {
+                      id: parsed.id,
+                      tanggal: parsed.tanggal,
+                      keterangan: parsed.keterangan,
+                      nominal: parsed.nominal,
+                      tipe: "mutasi",
+                      detail: `Mutasi: ${parsed.jenis}`
+                    };
+                  })
+                ].sort((a, b) => b.tanggal.localeCompare(a.tanggal));
 
-                <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <th className="p-4">Tanggal</th>
-                        <th className="p-4">ID Transaksi</th>
-                        <th className="p-4">Jenis</th>
-                        <th className="p-4">Keterangan / Detil</th>
-                        <th className="p-4 text-right">Nominal (IDR)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-semibold text-xs text-slate-300">
-                      {[
-                        ...pemasukanList.map(item => ({
-                          id: item.id,
-                          tanggal: item.tanggal,
-                          keterangan: item.keterangan || "Pendapatan Bersih Lahan",
-                          nominal: item.pendapatan_bersih,
-                          tipe: "pemasukan",
-                          detail: `${item.luasan} bahu (Pendapatan Kotor: ${formatIDR(item.pendapatan_kotor)})`
-                        })),
-                        ...pengeluaranList.map(item => {
-                          const parsed = parsePengeluaranItem(item);
-                          return {
-                            id: parsed.id,
-                            tanggal: parsed.tanggal,
-                            keterangan: parsed.keterangan,
-                            nominal: parsed.nominal,
-                            tipe: "pengeluaran",
-                            detail: `Kategori: ${parsed.kategori}`
-                          };
-                        }),
-                        ...mutasiList.map(item => {
-                          const parsed = parseMutasiItem(item);
-                          return {
-                            id: parsed.id,
-                            tanggal: parsed.tanggal,
-                            keterangan: parsed.keterangan,
-                            nominal: parsed.nominal,
-                            tipe: "mutasi",
-                            detail: `Mutasi: ${parsed.jenis}`
-                          };
-                        })
-                      ]
-                        .sort((a, b) => b.tanggal.localeCompare(a.tanggal))
-                        .map((tx, idx) => (
-                          <tr key={`${tx.id}-${idx}`} className="hover:bg-slate-900/30 transition">
-                            <td className="p-4 font-mono text-[11px] text-indigo-400 whitespace-nowrap">{tx.tanggal}</td>
-                            <td className="p-4 font-mono text-[10px] text-slate-400">{tx.id}</td>
-                            <td className="p-4">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                  tx.tipe === "pemasukan"
-                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                    : tx.tipe === "pengeluaran"
-                                    ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                    : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                }`}
-                              >
-                                {tx.tipe === "pemasukan" ? "Pemasukan" : tx.tipe === "pengeluaran" ? "Pengeluaran" : "Mutasi"}
-                              </span>
-                            </td>
-                            <td className="p-4 max-w-xs sm:max-w-md">
-                              <p className="font-bold text-slate-200 truncate">{tx.keterangan}</p>
-                              <p className="text-[10px] text-slate-500 mt-0.5 font-semibold truncate">{tx.detail}</p>
-                            </td>
-                            <td className={`p-4 text-right font-mono font-black text-xs ${
-                              tx.tipe === "pemasukan"
-                                ? "text-emerald-400"
-                                : tx.tipe === "pengeluaran"
-                                ? "text-rose-400"
-                                : "text-blue-400"
-                            }`}>
-                              {tx.tipe === "pemasukan" ? "+" : tx.tipe === "pengeluaran" ? "-" : ""}
-                              {formatIDR(tx.nominal)}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                const itemsPerPage = 10;
+                const paginatedInvestorTx = allInvestorTx.slice((investorPage - 1) * itemsPerPage, investorPage * itemsPerPage);
+
+                return (
+                  <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-sm font-black uppercase text-slate-300 tracking-wider">Rincian Riwayat Transaksi</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">Semua catatan pemasukan, pengeluaran, dan mutasi terurut berdasarkan tanggal.</p>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                              <th className="p-4">Tanggal</th>
+                              <th className="p-4">ID Transaksi</th>
+                              <th className="p-4">Jenis</th>
+                              <th className="p-4">Keterangan / Detil</th>
+                              <th className="p-4 text-right">Nominal (IDR)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60 font-semibold text-xs text-slate-300">
+                            {paginatedInvestorTx.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="py-10 text-center text-slate-500 font-semibold">
+                                  Tidak ada transaksi yang ditemukan.
+                                </td>
+                              </tr>
+                            ) : (
+                              paginatedInvestorTx.map((tx, idx) => (
+                                <tr key={`${tx.id}-${idx}`} className="hover:bg-slate-900/30 transition">
+                                  <td className="p-4 font-mono text-[11px] text-indigo-400 whitespace-nowrap">{tx.tanggal}</td>
+                                  <td className="p-4 font-mono text-[10px] text-slate-400">{tx.id}</td>
+                                  <td className="p-4">
+                                    <span
+                                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                        tx.tipe === "pemasukan"
+                                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                          : tx.tipe === "pengeluaran"
+                                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                          : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                                      }`}
+                                    >
+                                      {tx.tipe === "pemasukan" ? "Pemasukan" : tx.tipe === "pengeluaran" ? "Pengeluaran" : "Mutasi"}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 max-w-xs sm:max-w-md">
+                                    <p className="font-bold text-slate-200 truncate">{tx.keterangan}</p>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 font-semibold truncate">{tx.detail}</p>
+                                  </td>
+                                  <td className={`p-4 text-right font-mono font-black text-xs ${
+                                    tx.tipe === "pemasukan"
+                                      ? "text-emerald-400"
+                                      : tx.tipe === "pengeluaran"
+                                      ? "text-rose-400"
+                                      : "text-blue-400"
+                                  }`}>
+                                    {tx.tipe === "pemasukan" ? "+" : tx.tipe === "pengeluaran" ? "-" : ""}
+                                    {formatIDR(tx.nominal)}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      {renderPagination(investorPage, allInvestorTx.length, itemsPerPage, setInvestorPage)}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -1547,7 +1631,6 @@ export default function App() {
                     { id: "pemasukan", label: "Catatan Pemasukan", icon: TrendingUp },
                     { id: "pengeluaran", label: "Catatan Pengeluaran", icon: TrendingDown },
                     { id: "mutasi", label: "Mutasi Kas & Bank", icon: ArrowLeftRight },
-                    { id: "settings", label: "Integrasi & Konsol", icon: Settings },
                     { id: "share", label: "Share Akses Investor", icon: Share2 },
                   ].map((tab) => {
                     const TabIcon = tab.icon;
@@ -1622,8 +1705,8 @@ export default function App() {
                     <FileSpreadsheet className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-extrabold tracking-tight">Tridaya Ledger</h2>
-                    <p className="text-[10px] text-indigo-400 font-semibold">Live Google Sheets Sync</p>
+                    <h2 className="text-sm font-extrabold tracking-tight">Tridaya Online Report</h2>
+                    <p className="text-[10px] text-indigo-400 font-semibold">Laporan Keuangan Live</p>
                   </div>
                 </motion.div>
               )}
@@ -1663,7 +1746,6 @@ export default function App() {
               { id: "pemasukan", label: "Catatan Pemasukan", icon: TrendingUp },
               { id: "pengeluaran", label: "Catatan Pengeluaran", icon: TrendingDown },
               { id: "mutasi", label: "Mutasi Kas & Bank", icon: ArrowLeftRight },
-              { id: "settings", label: "Integrasi & Konsol", icon: Settings },
               { id: "share", label: "Share Akses Investor", icon: Share2 },
             ].map((tab) => {
               const TabIcon = tab.icon;
@@ -1747,7 +1829,6 @@ export default function App() {
               {activeTab === "pemasukan" && "Kelola Catatan Pemasukan"}
               {activeTab === "pengeluaran" && "Kelola Catatan Pengeluaran"}
               {activeTab === "mutasi" && "Rekonsiliasi Mutasi Kas"}
-              {activeTab === "settings" && "Konsol Pengaturan & Integrasi"}
               {activeTab === "share" && "Kelola Share Akses Investor"}
             </h1>
           </div>
@@ -1806,7 +1887,7 @@ export default function App() {
                     <div className="space-y-1.5 relative z-10">
                       <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider block">Total Luasan</span>
                       <h3 className="text-2xl font-black font-mono text-indigo-400 tracking-tight">{totalLuasan.toLocaleString("id-ID")} bahu</h3>
-                      <p className="text-[11px] text-slate-400 font-semibold">Total pengerjaan lahan aktif</p>
+                      <p className="text-[11px] text-slate-400 font-semibold">Total pengerjaan lahan</p>
                     </div>
                     <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
                       <Layers3 className="h-5.5 w-5.5" />
@@ -1960,32 +2041,6 @@ export default function App() {
                     )}
                   </div>
                 </div>
-
-                {/* Integration Status Console */}
-                <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/80 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="h-4 w-4 text-indigo-400" />
-                      <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider">Aktivitas Sinkronisasi Google Sheets</h4>
-                    </div>
-                    <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-bold uppercase border border-indigo-500/20 px-2 py-0.5 rounded-md">Realtime</span>
-                  </div>
-
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 font-mono text-[11px] leading-relaxed max-h-48 overflow-y-auto space-y-2">
-                    {syncLogs.length === 0 ? (
-                      <div className="text-slate-600 italic">Konsol log kosong. Mulai lakukan perubahan data untuk melihat riwayat sinkronisasi.</div>
-                    ) : (
-                      syncLogs.map(log => (
-                        <div key={log.id} className="flex items-start gap-2.5">
-                          <span className="text-slate-500">[{log.time}]</span>
-                          <span className={log.type === "success" ? "text-emerald-400" : log.type === "error" ? "text-rose-400 font-bold" : "text-slate-300"}>
-                            {log.text}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -2030,52 +2085,57 @@ export default function App() {
                             </td>
                           </tr>
                         ) : (
-                          pemasukanList.map((item) => {
-                            const parsed = parsePemasukanItem(item);
-                            return (
-                              <tr key={parsed.id} className="hover:bg-slate-800/20 transition">
-                                <td className="py-3.5 px-3 font-mono font-bold text-indigo-400 whitespace-nowrap">{parsed.id}</td>
-                                <td className="py-3.5 px-3 whitespace-nowrap">{parsed.tanggal}</td>
-                                <td className="py-3.5 px-3 text-right font-mono font-bold whitespace-nowrap">{parsed.luasan.toLocaleString("id-ID")} bahu</td>
-                                <td className="py-3.5 px-3 text-right font-mono text-slate-300 whitespace-nowrap">{formatIDR(parsed.pendapatan_kotor)}</td>
-                                <td className="py-3.5 px-3 text-right font-mono text-rose-300 whitespace-nowrap">-{formatIDR(parsed.gaji_operator)}</td>
-                                <td className="py-3.5 px-3 text-right font-mono text-rose-300 whitespace-nowrap">-{formatIDR(parsed.gaji_helper)}</td>
-                                <td className="py-3.5 px-3 text-right font-mono text-rose-300 whitespace-nowrap">-{formatIDR(parsed.lainnya)}</td>
-                                <td className="py-3.5 px-3 text-right font-mono font-black text-emerald-400 bg-emerald-500/5 whitespace-nowrap">{formatIDR(parsed.pendapatan_bersih)}</td>
-                                <td className="py-3.5 px-3 font-semibold text-slate-200 max-w-[150px] truncate" title={parsed.keterangan}>{parsed.keterangan || "-"}</td>
-                                <td className="py-3.5 px-3 text-slate-400 font-medium whitespace-nowrap">
-                                  <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50 block text-center max-w-[80px]">
-                                    {parsed.created_by}
-                                  </span>
-                                  <span className="text-[9px] text-slate-500 block mt-0.5">
-                                    {parsed.created_at ? new Date(parsed.created_at).toLocaleDateString("id-ID") : "-"}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-3">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <button
-                                      onClick={() => handleOpenEdit("pemasukan", parsed)}
-                                      className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
-                                      title="Edit"
-                                    >
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDelete("pemasukan", parsed.id)}
-                                      className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
-                                      title="Hapus"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
+                          (() => {
+                            const itemsPerPage = 10;
+                            const paginatedPemasukan = pemasukanList.slice((pemasukanPage - 1) * itemsPerPage, pemasukanPage * itemsPerPage);
+                            return paginatedPemasukan.map((item) => {
+                              const parsed = parsePemasukanItem(item);
+                              return (
+                                <tr key={parsed.id} className="hover:bg-slate-800/20 transition">
+                                  <td className="py-3.5 px-3 font-mono font-bold text-indigo-400 whitespace-nowrap">{parsed.id}</td>
+                                  <td className="py-3.5 px-3 whitespace-nowrap">{parsed.tanggal}</td>
+                                  <td className="py-3.5 px-3 text-right font-mono font-bold whitespace-nowrap">{parsed.luasan.toLocaleString("id-ID")} bahu</td>
+                                  <td className="py-3.5 px-3 text-right font-mono text-slate-300 whitespace-nowrap">{formatIDR(parsed.pendapatan_kotor)}</td>
+                                  <td className="py-3.5 px-3 text-right font-mono text-rose-300 whitespace-nowrap">-{formatIDR(parsed.gaji_operator)}</td>
+                                  <td className="py-3.5 px-3 text-right font-mono text-rose-300 whitespace-nowrap">-{formatIDR(parsed.gaji_helper)}</td>
+                                  <td className="py-3.5 px-3 text-right font-mono text-rose-300 whitespace-nowrap">-{formatIDR(parsed.lainnya)}</td>
+                                  <td className="py-3.5 px-3 text-right font-mono font-black text-emerald-400 bg-emerald-500/5 whitespace-nowrap">{formatIDR(parsed.pendapatan_bersih)}</td>
+                                  <td className="py-3.5 px-3 font-semibold text-slate-200 max-w-[150px] truncate" title={parsed.keterangan}>{parsed.keterangan || "-"}</td>
+                                  <td className="py-3.5 px-3 text-slate-400 font-medium whitespace-nowrap">
+                                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50 block text-center max-w-[80px]">
+                                      {parsed.created_by}
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 block mt-0.5">
+                                      {parsed.created_at ? new Date(parsed.created_at).toLocaleDateString("id-ID") : "-"}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-3">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <button
+                                        onClick={() => handleOpenEdit("pemasukan", parsed)}
+                                        className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete("pemasukan", parsed.id)}
+                                        className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
+                                        title="Hapus"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()
                         )}
                       </tbody>
                     </table>
                   </div>
+                  {renderPagination(pemasukanPage, pemasukanList.length, 10, setPemasukanPage)}
                 </div>
               </div>
             )}
@@ -2104,6 +2164,7 @@ export default function App() {
                           <th className="py-4 px-5">Tanggal</th>
                           <th className="py-4 px-5">Kategori</th>
                           <th className="py-4 px-5">Keterangan</th>
+                          <th className="py-4 px-5">PIC</th>
                           <th className="py-4 px-5 text-right">Nominal</th>
                           <th className="py-4 px-5">Dibuat Oleh</th>
                           <th className="py-4 px-5 text-center">Tindakan</th>
@@ -2112,57 +2173,71 @@ export default function App() {
                       <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
                         {pengeluaranList.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-10 text-center text-slate-500 font-semibold">
+                            <td colSpan={8} className="py-10 text-center text-slate-500 font-semibold">
                               Tidak ada catatan pengeluaran yang ditemukan.
                             </td>
                           </tr>
                         ) : (
-                          pengeluaranList.map((item) => {
-                            const parsed = parsePengeluaranItem(item);
-                            return (
-                              <tr key={parsed.id} className="hover:bg-slate-800/20 transition">
-                                <td className="py-3.5 px-5 font-mono font-bold text-indigo-400">{parsed.id}</td>
-                                <td className="py-3.5 px-5 whitespace-nowrap">{parsed.tanggal}</td>
-                                <td className="py-3.5 px-5">
-                                  <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-full ${getCategoryBadgeClass(parsed.kategori)}`}>
-                                    {parsed.kategori}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-5 font-semibold text-slate-200">{parsed.keterangan || "-"}</td>
-                                <td className="py-3.5 px-5 text-right font-mono font-black text-rose-400">{formatIDR(parsed.nominal)}</td>
-                                <td className="py-3.5 px-5 text-slate-400 font-medium whitespace-nowrap">
-                                  <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50 block text-center max-w-[80px]">
-                                    {parsed.created_by}
-                                  </span>
-                                  <span className="text-[9px] text-slate-500 block mt-0.5">
-                                    {parsed.created_at ? new Date(parsed.created_at).toLocaleDateString("id-ID") : "-"}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-5">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() => handleOpenEdit("pengeluaran", parsed)}
-                                      className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
-                                      title="Edit"
-                                    >
-                                      <Edit2 className="h-3.5 w-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDelete("pengeluaran", parsed.id)}
-                                      className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
-                                      title="Hapus"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
+                          (() => {
+                            const itemsPerPage = 10;
+                            const paginatedPengeluaran = pengeluaranList.slice((pengeluaranPage - 1) * itemsPerPage, pengeluaranPage * itemsPerPage);
+                            return paginatedPengeluaran.map((item) => {
+                              const parsed = parsePengeluaranItem(item);
+                              return (
+                                <tr key={parsed.id} className="hover:bg-slate-800/20 transition">
+                                  <td className="py-3.5 px-5 font-mono font-bold text-indigo-400">{parsed.id}</td>
+                                  <td className="py-3.5 px-5 whitespace-nowrap">{parsed.tanggal}</td>
+                                  <td className="py-3.5 px-5">
+                                    <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-full ${getCategoryBadgeClass(parsed.kategori)}`}>
+                                      {parsed.kategori}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-5 font-semibold text-slate-200">{parsed.keterangan || "-"}</td>
+                                  <td className="py-3.5 px-5 text-slate-300 font-medium">
+                                    {parsed.pic ? (
+                                      <span className="px-2.5 py-1 bg-slate-800 border border-slate-700/60 rounded-lg text-[10px] font-bold text-indigo-300">
+                                        {parsed.pic}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-600 italic text-[11px]">-</span>
+                                    )}
+                                  </td>
+                                  <td className="py-3.5 px-5 text-right font-mono font-black text-rose-400">{formatIDR(parsed.nominal)}</td>
+                                  <td className="py-3.5 px-5 text-slate-400 font-medium whitespace-nowrap">
+                                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50 block text-center max-w-[80px]">
+                                      {parsed.created_by}
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 block mt-0.5">
+                                      {parsed.created_at ? new Date(parsed.created_at).toLocaleDateString("id-ID") : "-"}
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-5">
+                                    <div className="flex items-center justify-center gap-2">
+                                      <button
+                                        onClick={() => handleOpenEdit("pengeluaran", parsed)}
+                                        className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete("pengeluaran", parsed.id)}
+                                        className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
+                                        title="Hapus"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()
                         )}
                       </tbody>
                     </table>
                   </div>
+                  {renderPagination(pengeluaranPage, pengeluaranList.length, 10, setPengeluaranPage)}
                 </div>
               </div>
             )}
@@ -2249,94 +2324,6 @@ export default function App() {
                         )}
                       </tbody>
                     </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* E. INTEGRATION & CONFIG TAB */}
-            {activeTab === "settings" && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Google Sheet details */}
-                <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 lg:col-span-2 space-y-6">
-                  <div>
-                    <h3 className="text-sm font-black uppercase text-slate-300 tracking-wider">Pengaturan Spreadsheet & API</h3>
-                    <p className="text-xs text-slate-500 mt-1">Konfigurasi sinkronisasi langsung dengan Google Sheets Web App</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">URL Apps Script / Web App URL</label>
-                      <div className="relative">
-                        <Database className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                        <input
-                          type="text"
-                          readOnly
-                          value="https://script.google.com/macros/s/AKfycbxBtoDOgKJYlO2IMV928Q0nhxVzzYN1eqvHKcfxP-4f3QyqwhaVWgTQy_ZkrclPalT50g/exec"
-                          className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-800 text-slate-300 font-mono text-[11px] rounded-xl focus:outline-none focus:border-slate-700 font-semibold"
-                        />
-                      </div>
-                      <p className="text-[11px] text-indigo-400/80 flex items-center gap-1.5 font-semibold mt-1">
-                        <Shield className="h-3.5 w-3.5" />
-                        Aplikasi secara otomatis memproksikan koneksi ini melalui backend (/api/*) untuk mencegah CORS.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                        <span className="text-[9px] text-slate-500 font-black uppercase tracking-wider block">Username Otentikasi</span>
-                        <p className="text-xs font-mono font-bold text-slate-200">admin</p>
-                      </div>
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                        <span className="text-[9px] text-slate-500 font-black uppercase tracking-wider block">Password Otentikasi</span>
-                        <p className="text-xs font-mono font-bold text-slate-200">123 (Proxy payload)</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={loadDataFromSheets}
-                        disabled={syncStatus === "syncing"}
-                        className="flex-1 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-xs font-bold py-3.5 rounded-xl transition shadow-lg shadow-indigo-600/20 text-white flex items-center justify-center gap-2 cursor-pointer"
-                      >
-                        <RefreshCw className={`h-4 w-4 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
-                        Segarkan Semua Kategori
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right: Architecture card */}
-                <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800/80 space-y-6">
-                  <div>
-                    <h3 className="text-sm font-black uppercase text-slate-300 tracking-wider">Status Lembar Kerja</h3>
-                    <p className="text-xs text-slate-500 mt-1 font-semibold">Integrasi lembar data</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {[
-                      { sheet: "Pemasukan", desc: "Catatan Pendapatan", status: syncStatus === "success" ? "active" : "offline" },
-                      { sheet: "Pengeluaran", desc: "Catatan Pembayaran", status: syncStatus === "success" ? "active" : "offline" },
-                      { sheet: "MutasiKas", desc: "Mutasi Kas & Bank", status: syncStatus === "success" ? "active" : "offline" },
-                    ].map((sh) => (
-                      <div key={sh.sheet} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-extrabold text-slate-200">{sh.sheet}</p>
-                          <p className="text-[10px] text-slate-500 font-semibold">{sh.desc}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${sh.status === "active" ? "bg-emerald-400 shadow-md shadow-emerald-400/50 animate-pulse" : "bg-amber-400"}`} />
-                          <span className="text-[10px] font-extrabold uppercase text-slate-400">{sh.status === "active" ? "Terkoneksi" : "Luring"}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-[11px] text-slate-400 leading-relaxed font-semibold">
-                    <div className="flex items-start gap-2">
-                      <Info className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
-                      <p>Sistem ini mentransfer setiap aksi penambahan, pengubahan, dan penghapusan secara instan ke server proxy Google Sheet Anda. Jika spreadsheet kosong, data tersimpan aman di database lokal.</p>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2619,20 +2606,34 @@ export default function App() {
                   <>
                     {/* Category Selection / Mutasi fields */}
                     {modalType !== "mutasi" ? (
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Kategori</label>
-                        <select
-                          value={formKategori}
-                          onChange={(e) => setFormKategori(e.target.value)}
-                          className="w-full px-4 py-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-200 transition font-bold"
-                        >
-                          {categoriesList
-                            .filter(c => c.tipe === modalType)
-                            .map(cat => (
-                              <option key={cat.id} value={cat.nama}>{cat.nama}</option>
-                            ))}
-                        </select>
-                      </div>
+                      <>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Kategori</label>
+                          <select
+                            value={formKategori}
+                            onChange={(e) => setFormKategori(e.target.value)}
+                            className="w-full px-4 py-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-200 transition font-bold"
+                          >
+                            {categoriesList
+                              .filter(c => c.tipe === modalType)
+                              .map(cat => (
+                                <option key={cat.id} value={cat.nama}>{cat.nama}</option>
+                              ))}
+                          </select>
+                        </div>
+                        {modalType === "pengeluaran" && (
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">PIC (Pengguna Uang)</label>
+                            <input
+                              type="text"
+                              value={formPic}
+                              onChange={(e) => setFormPic(e.target.value)}
+                              placeholder="Nama PIC / penanggung jawab..."
+                              className="w-full px-4 py-2.5 text-xs bg-slate-950 border border-slate-800 rounded-xl focus:outline-none focus:border-indigo-500 text-slate-200 transition font-bold"
+                            />
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Jenis Mutasi</label>

@@ -6,6 +6,7 @@ export interface Transaction {
   nominal: number;
   created_by: string;
   created_at: string;
+  pic?: string;
 }
 
 export interface Pemasukan {

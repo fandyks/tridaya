@@ -81,7 +81,7 @@ function initializeSheetHeaders(name, sheet) {
     headers = ["id", "tanggal", "luasan", "pendapatan_kotor", "gaji_operator", "gaji_helper", "lainnya", "pendapatan_bersih", "keterangan", "nominal", "created_by", "created_at", "updated_at"];
     sheet.appendRow(headers);
   } else if (name === "Pengeluaran") {
-    headers = ["id", "tanggal", "kategori", "keterangan", "nominal", "created_by", "created_at", "updated_at"];
+    headers = ["id", "tanggal", "kategori", "keterangan", "nominal", "pic", "created_by", "created_at", "updated_at"];
     sheet.appendRow(headers);
   } else if (name === "MutasiKas") {
     headers = ["id", "tanggal", "jenis", "keterangan", "nominal", "created_by", "created_at", "updated_at"];
