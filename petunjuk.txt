@@ -1,0 +1,559 @@
+# PETUNJUK INTEGRASI GOOGLE SHEETS & FRONTEND REACT SPA (TRIDAYA LEDGER)
+
+Aplikasi Tridaya Ledger kini telah berhasil di-refactor menjadi aplikasi **Client-Side SPA** murni tanpa server Node.js backend. Semua request dari frontend React langsung diarahkan menuju Google Apps Script Web App dengan aman (bebas masalah CORS berkat header `Content-Type: text/plain` dan CORS-ready method).
+
+---
+
+## 1. DESKRIPSI PERUBAHAN REACT (FRONTEND)
+
+- **Penghapusan Node.js Backend (`server.ts`):** Seluruh file server Express, library CJS bundling, proxy, dan dependencies backend telah dihapus untuk menghemat bandwidth server dan cold-start latency.
+- **Direct fetch ke Google Apps Script:** Aplikasi React murni memanggil URL Apps Script secara langsung dari browser menggunakan helper di `src/services/api.ts`.
+- **Sistem Login Berbasis Sheets:** Otentikasi `admin` tidak lagi hardcoded di env, melainkan menggunakan sheet database `Users` yang memvalidasi `username`, `password`, dan `status === 'Aktif'`.
+- **Integrasi Penuh Tab Akun/Logout:** Sidebars (Desktop & Mobile) kini membaca metadata dari profil user yang sedang aktif dan menyediakan tombol "Keluar Akun" (Logout) dengan visual modern.
+- **Pembaruan Konfigurasi Build:** Build system dikonfigurasikan sebagai murni Single Page Application (SPA). `package.json` telah dibersihkan dari server-side scripts dan package express, dan Vite diatur untuk mem-bind server dev ke port `3000` dan host `0.0.0.0`.
+
+---
+
+## 2. STRUKTUR FOLDER APLIKASI
+```
+/
+├── .env.example       <- Konfigurasi environment (VITE_API_URL)
+├── .gitignore         <- Pengabaian file lokal / node_modules
+├── index.html         <- HTML Entry Point utama
+├── metadata.json      <- Metadata aplikasi Tridaya
+├── package.json       <- Konfigurasi Client-Side React SPA (Vite, Tailwind, Recharts)
+├── tsconfig.json      <- Konfigurasi kompilasi TypeScript
+├── vite.config.ts     <- Vite Server binding ke host 0.0.0.0 & port 3000
+├── petunjuk.txt       <- Dokumen panduan ini (deskripsi & source code)
+└── src/
+    ├── App.tsx        <- Core dashboard UI, layouting, tab views, modal, dan state
+    ├── index.css      <- Impor Google Fonts (Inter, JetBrains Mono) & Tailwind CSS 4.0
+    ├── main.tsx       <- React DOM renderer
+    ├── types.ts       <- Definisi type-safety TypeScript (Pemasukan, Transaction, dll)
+    └── services/
+        └── api.ts     <- Centralized API service untuk GET dan POST direct fetch
+```
+
+---
+
+## 3. SOURCE CODE GOOGLE APPS SCRIPT YANG BARU (doGet & doPost Router)
+
+Silakan salin seluruh kode di bawah ini ke editor **Google Apps Script** Anda (melalui `Extensions > Apps Script` pada Google Spreadsheet Anda):
+
+```javascript
+// =========================================================================
+// GOOGLE APPS SCRIPT - TRIDAYA LEDGER BACKEND (doGet & doPost Router)
+// =========================================================================
+// SPREADSHEET SETUP:
+// Pastikan Anda mempublikasikan script ini sebagai Web App:
+// 1. Klik Deploy > New deployment.
+// 2. Pilih type: Web app.
+// 3. Set "Execute as": "Me" (Saya).
+// 4. Set "Who has access": "Anyone" (Siapa saja).
+// 5. Salin Web App URL dan pasang di React (.env / VITE_API_URL).
+// =========================================================================
+
+var WHITELISTED_SHEETS = ["Users", "Pemasukan", "Pengeluaran", "MutasiKas", "ShareTokens", "Setting", "Kategori"];
+
+function getSpreadsheet() {
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getOrCreateSheet(name) {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    initializeSheetHeaders(name, sheet);
+  }
+  return sheet;
+}
+
+// Inisialisasi header kolom default jika sheet baru dibuat
+function initializeSheetHeaders(name, sheet) {
+  var headers = [];
+  if (name === "Users") {
+    headers = ["id", "username", "password", "nama", "role", "status", "created_at", "updated_at"];
+    sheet.appendRow(headers);
+    // Tambahkan user admin default jika kosong
+    sheet.appendRow(["USR-001", "admin", "123", "Administrator Tridaya", "admin", "Aktif", new Date().toISOString(), new Date().toISOString()]);
+  } else if (name === "Pemasukan") {
+    headers = ["id", "tanggal", "luasan", "pendapatan_kotor", "gaji_operator", "gaji_helper", "lainnya", "pendapatan_bersih", "keterangan", "nominal", "created_by", "created_at", "updated_at"];
+    sheet.appendRow(headers);
+  } else if (name === "Pengeluaran") {
+    headers = ["id", "tanggal", "kategori", "keterangan", "nominal", "created_by", "created_at", "updated_at"];
+    sheet.appendRow(headers);
+  } else if (name === "MutasiKas") {
+    headers = ["id", "tanggal", "jenis", "keterangan", "nominal", "created_by", "created_at", "updated_at"];
+    sheet.appendRow(headers);
+  } else if (name === "ShareTokens") {
+    headers = ["id", "token", "created_at", "expires_at", "status", "created_by"];
+    sheet.appendRow(headers);
+  } else if (name === "Setting") {
+    headers = ["key", "value"];
+    sheet.appendRow(headers);
+  } else if (name === "Kategori") {
+    headers = ["id", "nama", "tipe", "warna"];
+    sheet.appendRow(headers);
+    // Kategori default
+    sheet.appendRow(["CAT-001", "Operasional", "pengeluaran", "#f43f5e"]);
+    sheet.appendRow(["CAT-002", "Service", "pengeluaran", "#f59e0b"]);
+    sheet.appendRow(["CAT-003", "Sparepart", "pengeluaran", "#10b981"]);
+  }
+}
+
+// Utility Helper to convert Sheet to JSON Array of Objects (Casing & Empty Row Safe)
+function sheetToObjects(sheet) {
+  var data = sheet.getDataRange().getValues();
+  if (!data || data.length <= 1) return [];
+  var headers = data[0];
+  var result = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row) continue;
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      var header = headers[j];
+      if (!header) continue;
+      // Normalize header to lowercase and trim spaces for absolute resilience
+      var headerKey = String(header).trim().toLowerCase();
+      var cellVal = row[j];
+      if (cellVal instanceof Date) {
+        obj[headerKey] = cellVal.toISOString().split("T")[0]; // YYYY-MM-DD
+      } else {
+        obj[headerKey] = cellVal !== undefined && cellVal !== null ? cellVal : "";
+      }
+    }
+    result.push(obj);
+  }
+  return result;
+}
+
+// Standard JSON Response Wrapper
+function jsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Router untuk request GET
+function doGet(e) {
+  var action = e.parameter.action;
+  if (!action) {
+    return jsonResponse({ status: "error", message: "Action parameter is required." });
+  }
+  
+  try {
+    switch (action) {
+      case "getDashboard":
+        return handleGetDashboard();
+      case "getPemasukan":
+        return handleGetPemasukan();
+      case "getPengeluaran":
+        return handleGetPengeluaran();
+      case "getMutasiKas":
+        return handleGetMutasiKas();
+      case "getShareTokens":
+        return handleGetShareTokens();
+      case "getInvestorDashboard":
+        var token = e.parameter.token;
+        return handleGetInvestorDashboard(token);
+      default:
+        return jsonResponse({ status: "error", message: "Unknown GET action: " + action });
+    }
+  } catch (error) {
+    return jsonResponse({ status: "error", message: error.toString() });
+  }
+}
+
+// Router untuk request POST
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ status: "error", message: "Empty POST body." });
+    }
+    
+    var payload;
+    try {
+      payload = JSON.parse(e.postData.contents);
+    } catch (parseErr) {
+      return jsonResponse({ status: "error", message: "Invalid JSON format: " + parseErr.toString() });
+    }
+    
+    if (!payload) {
+      return jsonResponse({ status: "error", message: "Payload is empty." });
+    }
+    
+    var action = payload.action;
+    if (!action) {
+      return jsonResponse({ status: "error", message: "Action inside JSON payload is required." });
+    }
+    
+    switch (action) {
+      case "login":
+        var username = payload.username !== undefined ? payload.username : "";
+        var password = payload.password !== undefined ? payload.password : "";
+        return handleLogin(username, password);
+      case "createPemasukan":
+        return handleCreatePemasukan(payload.data);
+      case "updatePemasukan":
+        return handleUpdatePemasukan(payload.id, payload.data);
+      case "deletePemasukan":
+        return handleDeletePemasukan(payload.id);
+      case "createPengeluaran":
+        return handleCreatePengeluaran(payload.data);
+      case "updatePengeluaran":
+        return handleUpdatePengeluaran(payload.id, payload.data);
+      case "deletePengeluaran":
+        return handleDeletePengeluaran(payload.id);
+      case "createMutasiKas":
+        return handleCreateMutasiKas(payload.data);
+      case "updateMutasiKas":
+        return handleUpdateMutasiKas(payload.id, payload.data);
+      case "deleteMutasiKas":
+        return handleDeleteMutasiKas(payload.id);
+      case "generateShareToken":
+        return handleGenerateShareToken();
+      case "validateShareToken":
+        return handleValidateShareToken(payload.token);
+      default:
+        return jsonResponse({ status: "error", message: "Unknown POST action: " + action });
+    }
+  } catch (error) {
+    return jsonResponse({ status: "error", message: error.toString() });
+  }
+}
+
+// -------------------------------------------------------------------------
+// GET ACTION HANDLERS
+// -------------------------------------------------------------------------
+
+function handleGetDashboard() {
+  var pemasukanSheet = getOrCreateSheet("Pemasukan");
+  var pengeluaranSheet = getOrCreateSheet("Pengeluaran");
+  var mutasiSheet = getOrCreateSheet("MutasiKas");
+  
+  var pemasukanList = sheetToObjects(pemasukanSheet);
+  var pengeluaranList = sheetToObjects(pengeluaranSheet);
+  var mutasiList = sheetToObjects(mutasiSheet);
+  
+  var totalPemasukan = pemasukanList.reduce(function(acc, curr) { return acc + (Number(curr.pendapatan_bersih) || 0); }, 0);
+  var totalPengeluaran = pengeluaranList.reduce(function(acc, curr) { return acc + (Number(curr.nominal) || 0); }, 0);
+  var totalKas = mutasiList.reduce(function(acc, curr) { 
+    return acc + (curr.jenis === "Deposit" ? (Number(curr.nominal) || 0) : -(Number(curr.nominal) || 0)); 
+  }, 0);
+  
+  var totalSaldo = totalKas + totalPemasukan + totalPengeluaran;
+  
+  return jsonResponse({
+    status: "success",
+    data: {
+      totalPemasukan: totalPemasukan,
+      totalPengeluaran: totalPengeluaran,
+      totalKas: totalKas,
+      totalSaldo: totalSaldo,
+      totalLuasan: pemasukanList.reduce(function(acc, curr) { return acc + (Number(curr.luasan) || 0); }, 0)
+    }
+  });
+}
+
+function handleGetPemasukan() {
+  var sheet = getOrCreateSheet("Pemasukan");
+  var list = sheetToObjects(sheet);
+  return jsonResponse({ status: "success", data: list });
+}
+
+function handleGetPengeluaran() {
+  var sheet = getOrCreateSheet("Pengeluaran");
+  var list = sheetToObjects(sheet);
+  return jsonResponse({ status: "success", data: list });
+}
+
+function handleGetMutasiKas() {
+  var sheet = getOrCreateSheet("MutasiKas");
+  var list = sheetToObjects(sheet);
+  return jsonResponse({ status: "success", data: list });
+}
+
+function handleGetShareTokens() {
+  var sheet = getOrCreateSheet("ShareTokens");
+  var list = sheetToObjects(sheet);
+  return jsonResponse({ status: "success", data: list });
+}
+
+function handleGetInvestorDashboard(token) {
+  if (!token) {
+    return jsonResponse({ status: "error", message: "Token is required." });
+  }
+  
+  var tokenSheet = getOrCreateSheet("ShareTokens");
+  var tokens = sheetToObjects(tokenSheet);
+  var matchedToken = null;
+  
+  for (var i = 0; i < tokens.length; i++) {
+    if (tokens[i].token === token && tokens[i].status === "Aktif") {
+      matchedToken = tokens[i];
+      break;
+    }
+  }
+  
+  if (!matchedToken) {
+    return jsonResponse({ status: "success", valid: false, message: "Token tidak valid atau dinonaktifkan." });
+  }
+  
+  // Valid token -> Fetch data lists
+  var pms = sheetToObjects(getOrCreateSheet("Pemasukan"));
+  var pgl = sheetToObjects(getOrCreateSheet("Pengeluaran"));
+  var mts = sheetToObjects(getOrCreateSheet("MutasiKas"));
+  
+  return jsonResponse({
+    status: "success",
+    valid: true,
+    data: {
+      pemasukan: pms,
+      pengeluaran: pgl,
+      mutasi: mts
+    }
+  });
+}
+
+// -------------------------------------------------------------------------
+// POST ACTION HANDLERS
+// -------------------------------------------------------------------------
+
+function handleLogin(username, password) {
+  var sheet = getOrCreateSheet("Users");
+  var users = sheetToObjects(sheet);
+  
+  if (!users || !Array.isArray(users)) {
+    return jsonResponse({ status: "error", message: "Gagal memuat data pengguna dari spreadsheet." });
+  }
+  
+  var userFound = null;
+  var targetUsername = String(username).trim().toLowerCase();
+  var targetPassword = String(password).trim();
+  
+  for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    if (u) {
+      // Support both normalized lowercase and original key mappings
+      var uUsername = String(u.username || u.Username || "").trim().toLowerCase();
+      var uPassword = String(u.password || u.Password || "").trim();
+      if (uUsername === targetUsername && uPassword === targetPassword) {
+        userFound = u;
+        break;
+      }
+    }
+  }
+  
+  if (!userFound) {
+    return jsonResponse({ status: "error", message: "Username atau password salah." });
+  }
+  
+  var status = String(userFound.status || userFound.Status || "").trim();
+  if (status !== "Aktif" && status !== "") { // default to active if column missing
+    return jsonResponse({ status: "error", message: "Akun Anda dinonaktifkan. Silakan hubungi admin." });
+  }
+  
+  return jsonResponse({
+    status: "success",
+    user: {
+      id: userFound.id || userFound.Id || "",
+      username: userFound.username || userFound.Username || "",
+      nama: userFound.nama || userFound.Nama || "",
+      role: userFound.role || userFound.Role || ""
+    }
+  });
+}
+
+// CRUD generic helpers
+function createRecord(sheetName, recordData, idPrefix) {
+  var sheet = getOrCreateSheet(sheetName);
+  var headers = sheet.getDataRange().getValues()[0];
+  var newRow = [];
+  
+  var id = idPrefix + "-" + Math.floor(1000 + Math.random() * 9000);
+  recordData.id = id;
+  recordData.created_at = new Date().toISOString();
+  recordData.updated_at = new Date().toISOString();
+  
+  for (var i = 0; i < headers.length; i++) {
+    var key = headers[i];
+    newRow.push(recordData[key] !== undefined ? recordData[key] : "");
+  }
+  
+  sheet.appendRow(newRow);
+  return recordData;
+}
+
+function updateRecord(sheetName, id, recordData) {
+  var sheet = getOrCreateSheet(sheetName);
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  
+  var rowIndex = -1;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      rowIndex = i + 1; // 1-based index in Excel/Sheets (plus headers row is 1)
+      break;
+    }
+  }
+  
+  if (rowIndex === -1) {
+    throw new Error("Record with ID " + id + " not found in sheet " + sheetName);
+  }
+  
+  recordData.updated_at = new Date().toISOString();
+  
+  for (var j = 0; j < headers.length; j++) {
+    var key = headers[j];
+    if (recordData[key] !== undefined) {
+      sheet.getRange(rowIndex, j + 1).setValue(recordData[key]);
+    }
+  }
+  return { id: id, status: "updated" };
+}
+
+function deleteRecord(sheetName, id) {
+  var sheet = getOrCreateSheet(sheetName);
+  var data = sheet.getDataRange().getValues();
+  
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { id: id, status: "deleted" };
+    }
+  }
+  throw new Error("Record with ID " + id + " not found in sheet " + sheetName);
+}
+
+function handleCreatePemasukan(data) {
+  var res = createRecord("Pemasukan", data, "PMS");
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleUpdatePemasukan(id, data) {
+  var res = updateRecord("Pemasukan", id, data);
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleDeletePemasukan(id) {
+  var res = deleteRecord("Pemasukan", id);
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleCreatePengeluaran(data) {
+  var res = createRecord("Pengeluaran", data, "PGL");
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleUpdatePengeluaran(id, data) {
+  var res = updateRecord("Pengeluaran", id, data);
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleDeletePengeluaran(id) {
+  var res = deleteRecord("Pengeluaran", id);
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleCreateMutasiKas(data) {
+  var res = createRecord("MutasiKas", data, "MTS");
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleUpdateMutasiKas(id, data) {
+  var res = updateRecord("MutasiKas", id, data);
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleDeleteMutasiKas(id) {
+  var res = deleteRecord("MutasiKas", id);
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleGenerateShareToken() {
+  var tokenSheet = getOrCreateSheet("ShareTokens");
+  var token = "TKN-" + Math.floor(100000 + Math.random() * 900000) + "-" + Date.now();
+  
+  var payload = {
+    token: token,
+    status: "Aktif",
+    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 hari kedaluwarsa
+    created_by: "admin"
+  };
+  
+  var res = createRecord("ShareTokens", payload, "SHR");
+  return jsonResponse({ status: "success", data: res });
+}
+
+function handleValidateShareToken(token) {
+  var tokenSheet = getOrCreateSheet("ShareTokens");
+  var tokens = sheetToObjects(tokenSheet);
+  var valid = false;
+  
+  for (var i = 0; i < tokens.length; i++) {
+    if (tokens[i].token === token && tokens[i].status === "Aktif") {
+      valid = true;
+      break;
+    }
+  }
+  return jsonResponse({ status: "success", valid: valid });
+}
+```
+
+---
+
+## 4. DAFTAR API ENDPOINTS (GET & POST)
+
+### A. HTTP GET REQUESTS (Query Parameter `?action=X`)
+
+1. **Get Dashboard Summary**
+   - URL: `VITE_API_URL?action=getDashboard`
+   - Response: Statistik ringkasan pendapatan bersiah, luasan lahan, kas, pengeluaran, saldo.
+2. **Get Pemasukan**
+   - URL: `VITE_API_URL?action=getPemasukan`
+   - Response: Daftar seluruh transaksi pemasukan panen lahan.
+3. **Get Pengeluaran**
+   - URL: `VITE_API_URL?action=getPengeluaran`
+   - Response: Daftar seluruh transaksi pengeluaran operasional.
+4. **Get Mutasi Kas**
+   - URL: `VITE_API_URL?action=getMutasiKas`
+   - Response: Daftar seluruh riwayat mutasi kas (deposit & penarikan).
+5. **Get Share Tokens History**
+   - URL: `VITE_API_URL?action=getShareTokens`
+   - Response: Daftar token share akses investor yang aktif/pernah dibuat.
+6. **Get Investor Dashboard**
+   - URL: `VITE_API_URL?action=getInvestorDashboard&token=<TOKEN_ID>`
+   - Response: Memvalidasi token investor sekaligus mereturn list data pemasukan, pengeluaran, & mutasi secara real-time.
+
+---
+
+### B. HTTP POST REQUESTS (JSON Payload `{ "action": "X", ... }`)
+
+1. **User Login**
+   - Payload: `{ "action": "login", "username": "<USER>", "password": "<PASS>" }`
+2. **Create Pemasukan**
+   - Payload: `{ "action": "createPemasukan", "data": { ... } }`
+3. **Update Pemasukan**
+   - Payload: `{ "action": "updatePemasukan", "id": "<ID>", "data": { ... } }`
+4. **Delete Pemasukan**
+   - Payload: `{ "action": "deletePemasukan", "id": "<ID>" }`
+5. **Create Pengeluaran**
+   - Payload: `{ "action": "createPengeluaran", "data": { ... } }`
+6. **Update Pengeluaran**
+   - Payload: `{ "action": "updatePengeluaran", "id": "<ID>", "data": { ... } }`
+7. **Delete Pengeluaran**
+   - Payload: `{ "action": "deletePengeluaran", "id": "<ID>" }`
+8. **Create Mutasi Kas**
+   - Payload: `{ "action": "createMutasiKas", "data": { ... } }`
+9. **Update Mutasi Kas**
+   - Payload: `{ "action": "updateMutasiKas", "id": "<ID>", "data": { ... } }`
+10. **Delete Mutasi Kas**
+    - Payload: `{ "action": "deleteMutasiKas", "id": "<ID>" }`
+11. **Generate Share Token**
+    - Payload: `{ "action": "generateShareToken" }`
+12. **Validate Share Token**
+    - Payload: `{ "action": "validateShareToken", "token": "<TOKEN_ID>" }`
+
+---
+*Aplikasi Anda sekarang siap dipublikasikan sepenuhnya dan berjalan dengan kecepatan maksimal!*

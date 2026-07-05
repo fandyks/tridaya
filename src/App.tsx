@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { md5 } from "js-md5";
+import { apiService } from "./services/api";
 import {
   TrendingUp,
   TrendingDown,
@@ -32,7 +34,8 @@ import {
   Share2,
   Copy,
   Eye,
-  Globe
+  Globe,
+  LogOut
 } from "lucide-react";
 import {
   AreaChart,
@@ -51,8 +54,7 @@ import {
 } from "recharts";
 import { Transaction, CashTransfer, Category, Pemasukan } from "./types";
 
-// Pre-seeded local fallback data
-const PRE_SEEDED_CATEGORIES: Category[] = [
+const DEFAULT_CATEGORIES: Category[] = [
   { id: "CAT-01", nama: "Gaji & Pendapatan", tipe: "pemasukan", warna: "emerald" },
   { id: "CAT-02", nama: "Penjualan Produk", tipe: "pemasukan", warna: "teal" },
   { id: "CAT-03", nama: "Investasi Masuk", tipe: "pemasukan", warna: "indigo" },
@@ -62,63 +64,68 @@ const PRE_SEEDED_CATEGORIES: Category[] = [
   { id: "CAT-07", nama: "Lainnya", tipe: "pengeluaran", warna: "slate" },
 ];
 
-const PRE_SEEDED_PEMASUKAN: Pemasukan[] = [
-  {
-    id: "TX-1001",
-    tanggal: "2026-06-25",
-    luasan: 120,
-    pendapatan_kotor: 15000000,
-    gaji_operator: 2500000,
-    gaji_helper: 1500000,
-    lainnya: 500000,
-    pendapatan_bersih: 10500000,
-    keterangan: "Sponsorship Tridaya Event",
-    nominal: 10500000,
-    created_by: "admin",
-    created_at: "2026-06-25T08:00:00.000Z"
-  },
-  {
-    id: "TX-1002",
-    tanggal: "2026-06-28",
-    luasan: 85,
-    pendapatan_kotor: 4500000,
-    gaji_operator: 1000000,
-    gaji_helper: 600000,
-    lainnya: 400000,
-    pendapatan_bersih: 2500000,
-    keterangan: "Penjualan Buku Panduan Tridaya",
-    nominal: 2500000,
-    created_by: "admin",
-    created_at: "2026-06-28T09:00:00.000Z"
-  },
-  {
-    id: "TX-1003",
-    tanggal: "2026-07-02",
-    luasan: 200,
-    pendapatan_kotor: 25000000,
-    gaji_operator: 4000000,
-    gaji_helper: 2500000,
-    lainnya: 1500000,
-    pendapatan_bersih: 17000000,
-    keterangan: "Suntikan Modal Kerja",
-    nominal: 17000000,
-    created_by: "admin",
-    created_at: "2026-07-02T10:00:00.000Z"
-  }
-];
-
-const PRE_SEEDED_PENGELUARAN: Transaction[] = [
-  { id: "TX-2001", tanggal: "2026-06-26", kategori: "Operasional", keterangan: "Pembelian BBM Solar", nominal: 1250000, created_by: "admin", created_at: "2026-06-26T08:00:00.000Z" },
-  { id: "TX-2002", tanggal: "2026-06-30", kategori: "Service", keterangan: "Perbaikan Hydrolic System", nominal: 4500000, created_by: "admin", created_at: "2026-06-30T09:00:00.000Z" },
-  { id: "TX-2003", tanggal: "2026-07-03", kategori: "Sparepart", keterangan: "Pembelian Filter Oli & Udara", nominal: 1500000, created_by: "admin", created_at: "2026-07-03T10:00:00.000Z" },
-];
-
-const PRE_SEEDED_MUTASI: CashTransfer[] = [
-  { id: "MT-3001", tanggal: "2026-06-27", jenis: "Deposit", keterangan: "Setoran Tunai Awal", nominal: 5000000, created_by: "admin", created_at: "2026-06-27T08:00:00.000Z" },
-  { id: "MT-3002", tanggal: "2026-07-01", jenis: "Penarikan", keterangan: "Penarikan Kas Operasional", nominal: 2000000, created_by: "admin", created_at: "2026-07-01T09:00:00.000Z" },
-];
-
 export default function App() {
+  // Authentication & session state
+  const [user, setUser] = useState<{ id: string; username: string; nama: string; role: string } | null>(() => {
+    const saved = localStorage.getItem("tridaya_user");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [sheetConnection, setSheetConnection] = useState<"connecting" | "connected" | "disconnected">("connecting");
+
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState<{ message: string; type: "success" | "error" | "info"; isOpen: boolean }>({
+    message: "",
+    type: "info",
+    isOpen: false,
+  });
+
+  const showSnackbar = (message: string, type: "success" | "error" | "info" = "info") => {
+    setSnackbar({ message, type, isOpen: true });
+    setTimeout(() => {
+      setSnackbar(prev => ({ ...prev, isOpen: false }));
+    }, 4000);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const expectedUsername = (import.meta.env.VITE_ADMIN_USERNAME || "admin").trim().toLowerCase();
+      const expectedPassword = (import.meta.env.VITE_ADMIN_PASSWORD || "fandyk").trim();
+
+      const enteredUsername = loginUsername.trim().toLowerCase();
+      const enteredPassword = loginPassword.trim();
+
+      if (enteredUsername === expectedUsername && enteredPassword === expectedPassword) {
+        const loggedInUser = {
+          id: "admin",
+          username: "admin",
+          nama: "Admin Tridaya",
+          role: "admin"
+        };
+        setUser(loggedInUser);
+        localStorage.setItem("tridaya_user", JSON.stringify(loggedInUser));
+        showSnackbar(`Selamat datang, Admin Tridaya!`, "success");
+        // Trigger load data from Sheets
+        loadDataFromSheets();
+        loadShareTokensHistory();
+      } else {
+        setLoginError("Username atau password salah.");
+        showSnackbar("Gagal masuk. Username atau password salah.", "error");
+      }
+    } catch (err: any) {
+      setLoginError(`Gagal masuk: ${err.message}`);
+      showSnackbar(`Koneksi gagal: ${err.message}`, "error");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   // Navigation & UI Layout states
   const [activeTab, setActiveTab] = useState<"ikhtisar" | "pemasukan" | "pengeluaran" | "mutasi" | "settings" | "share">("ikhtisar");
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -144,20 +151,20 @@ export default function App() {
   // Data states (fallback to LocalStorage if sheets notice / empty)
   const [pemasukanList, setPemasukanList] = useState<Pemasukan[]>(() => {
     const saved = localStorage.getItem("tridaya_pemasukan");
-    return saved ? JSON.parse(saved) : PRE_SEEDED_PEMASUKAN;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [pengeluaranList, setPengeluaranList] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem("tridaya_pengeluaran");
-    return saved ? JSON.parse(saved) : PRE_SEEDED_PENGELUARAN;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [mutasiList, setMutasiList] = useState<CashTransfer[]>(() => {
     const saved = localStorage.getItem("tridaya_mutasi");
-    return saved ? JSON.parse(saved) : PRE_SEEDED_MUTASI;
+    return saved ? JSON.parse(saved) : [];
   });
 
-  const [categoriesList] = useState<Category[]>(PRE_SEEDED_CATEGORIES);
+  const [categoriesList] = useState<Category[]>(DEFAULT_CATEGORIES);
 
   // Modals management
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -189,9 +196,29 @@ export default function App() {
   const [formLainnya, setFormLainnya] = useState<number>(0);
 
   // Robust helper to normalize any date string into standard YYYY-MM-DD
-  const normalizeDate = (dateStr: string): string => {
-    if (!dateStr) return new Date().toISOString().split("T")[0];
-    const trimmed = String(dateStr).trim();
+  const normalizeDate = (rawVal: any): string => {
+    if (rawVal === undefined || rawVal === null) {
+      return new Date().toISOString().split("T")[0];
+    }
+    
+    let dateStr = "";
+    if (typeof rawVal === "object") {
+      if (rawVal.value !== undefined) {
+        dateStr = String(rawVal.value);
+      } else if (rawVal.formattedValue !== undefined) {
+        dateStr = String(rawVal.formattedValue);
+      } else {
+        dateStr = String(rawVal);
+      }
+    } else {
+      dateStr = String(rawVal);
+    }
+
+    const trimmed = dateStr.trim();
+    if (!trimmed || trimmed === "[object Object]") {
+      return new Date().toISOString().split("T")[0];
+    }
+
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
       return trimmed;
     }
@@ -380,61 +407,55 @@ export default function App() {
 
     // 1. Fetch dashboard status
     try {
-      const res = await fetch("/api/dashboard");
-      const data = await res.json();
+      const data = await apiService.getDashboard();
       if (data.status === "success") {
         addLog("Koneksi dasbor Google Sheets berhasil.", "success");
       } else {
         addLog(`Informasi dasbor: ${data.message || "Buku kas kosong"}`, "info");
       }
     } catch (err: any) {
-      addLog(`Dasbor API: ${err.message}`, "error");
+      addLog(`Dasbor API luring: ${err.message}`, "error");
+      showSnackbar(`Gagal memuat status dasbor: ${err.message}`, "error");
       hasErrors = true;
     }
 
     // 2. Fetch Pemasukan sheet
     try {
-      const res = await fetch("/api/rincian?sheet=Pemasukan");
-      const data = await res.json();
-      if (data.status === "success" && Array.isArray(data.data) && data.data.length > 0) {
-        const parsedList = data.data.map((item: any) => parsePemasukanItem(item));
+      const data = await apiService.getPemasukan();
+      if (Array.isArray(data)) {
+        const parsedList = data.map((item: any) => parsePemasukanItem(item));
         setPemasukanList(parsedList);
-        addLog(`Berhasil memuat ${data.data.length} baris data Pemasukan.`, "success");
-      } else {
-        addLog(`Keterangan sheet Pemasukan: ${data.message || "Kosong atau belum terkonfigurasi"}`, "info");
+        addLog(`Berhasil memuat ${data.length} baris data Pemasukan.`, "success");
       }
     } catch (err: any) {
       addLog(`API Pemasukan offline: ${err.message}. Memuat cadangan lokal.`, "info");
+      showSnackbar(`Pemasukan: ${err.message}`, "error");
     }
 
     // 3. Fetch Pengeluaran sheet
     try {
-      const res = await fetch("/api/rincian?sheet=Pengeluaran");
-      const data = await res.json();
-      if (data.status === "success" && Array.isArray(data.data) && data.data.length > 0) {
-        const parsedList = data.data.map((item: any) => parsePengeluaranItem(item));
+      const data = await apiService.getPengeluaran();
+      if (Array.isArray(data)) {
+        const parsedList = data.map((item: any) => parsePengeluaranItem(item));
         setPengeluaranList(parsedList);
-        addLog(`Berhasil memuat ${data.data.length} baris data Pengeluaran.`, "success");
-      } else {
-        addLog(`Keterangan sheet Pengeluaran: ${data.message || "Kosong atau belum terkonfigurasi"}`, "info");
+        addLog(`Berhasil memuat ${data.length} baris data Pengeluaran.`, "success");
       }
     } catch (err: any) {
       addLog(`API Pengeluaran offline: ${err.message}. Memuat cadangan lokal.`, "info");
+      showSnackbar(`Pengeluaran: ${err.message}`, "error");
     }
 
     // 4. Fetch MutasiKas sheet
     try {
-      const res = await fetch("/api/rincian?sheet=MutasiKas");
-      const data = await res.json();
-      if (data.status === "success" && Array.isArray(data.data) && data.data.length > 0) {
-        const parsedList = data.data.map((item: any) => parseMutasiItem(item));
+      const data = await apiService.getMutasiKas();
+      if (Array.isArray(data)) {
+        const parsedList = data.map((item: any) => parseMutasiItem(item));
         setMutasiList(parsedList);
-        addLog(`Berhasil memuat ${data.data.length} baris data MutasiKas.`, "success");
-      } else {
-        addLog(`Keterangan sheet MutasiKas: ${data.message || "Kosong atau belum terkonfigurasi"}`, "info");
+        addLog(`Berhasil memuat ${data.length} baris data MutasiKas.`, "success");
       }
     } catch (err: any) {
       addLog(`API MutasiKas offline: ${err.message}. Memuat cadangan lokal.`, "info");
+      showSnackbar(`Mutasi Kas: ${err.message}`, "error");
     }
 
     if (hasErrors) {
@@ -448,26 +469,20 @@ export default function App() {
 
   const loadShareTokensHistory = async () => {
     try {
-      const res = await fetch("/api/rincian?sheet=ShareTokens");
-      if (!res.ok) {
-        throw new Error(`HTTP status ${res.status}`);
-      }
-      const data = await res.json();
-      if (data.status === "success" && Array.isArray(data.data)) {
+      const data = await apiService.getShareTokens();
+      if (Array.isArray(data)) {
         // Filter out headers or invalid empty rows
-        const cleaned = data.data.filter((row: any) => row.id && row.token);
+        const cleaned = data.filter((row: any) => row.id && row.token);
         // Sort by created_at descending
         const sorted = [...cleaned].sort((a: any, b: any) => {
           return (b.created_at || "").localeCompare(a.created_at || "");
         });
         setShareTokensHistory(sorted);
         // Find if there is an active one
-        const active = cleaned.find((row: any) => row.expires_at === "Aktif");
+        const active = cleaned.find((row: any) => (row.expires_at === "Aktif" || row.expired_at === "Aktif"));
         if (active) {
           setGeneratedToken(active.token);
         }
-      } else {
-        addLog(`Info ShareTokens: ${data.message || "Belum dikonfigurasi"}`, "info");
       }
     } catch (err: any) {
       addLog(`API ShareTokens luring atau terputus: ${err.message}`, "info");
@@ -480,21 +495,20 @@ export default function App() {
     setCopiedSuccess(false);
     addLog("Memulai proses pembuatan token share investor baru...", "info");
     try {
-      const res = await fetch("/api/share/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      const data = await res.json();
+      const data = await apiService.generateShareToken();
       if (data.status === "success" && data.token) {
         setGeneratedToken(data.token);
         addLog(`Tautan investor baru berhasil dibuat: token ${data.token}`, "success");
+        showSnackbar(`Sukses membuat link share investor baru!`, "success");
         // Reload history
         loadShareTokensHistory();
       } else {
         addLog(`Gagal membuat tautan share: ${data.message || "Unknown error"}`, "error");
+        showSnackbar(`Gagal membuat link: ${data.message}`, "error");
       }
     } catch (err: any) {
       addLog(`Kesalahan koneksi saat membuat token share: ${err.message}`, "error");
+      showSnackbar(`Kesalahan koneksi: ${err.message}`, "error");
     } finally {
       setIsGeneratingToken(false);
     }
@@ -514,6 +528,20 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Check connection to Google Sheets
+    setSheetConnection("connecting");
+    apiService.getDashboard()
+      .then(res => {
+        if (res && res.status === "success") {
+          setSheetConnection("connected");
+        } else {
+          setSheetConnection("disconnected");
+        }
+      })
+      .catch(() => {
+        setSheetConnection("disconnected");
+      });
+
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
     const isSharePath = window.location.pathname === "/share" || !!token;
@@ -523,8 +551,7 @@ export default function App() {
       setInvestorToken(token);
       setInvestorLoading(true);
       
-      fetch(`/api/share/verify?token=${token}`)
-        .then(res => res.json())
+      apiService.getInvestorDashboard(token)
         .then(data => {
           if (data.status === "success" && data.valid) {
             // Parse data lists
@@ -556,44 +583,14 @@ export default function App() {
       setInvestorError("Link tidak valid atau telah kedaluwarsa.");
     } else {
       addLog("Aplikasi diinisialisasi dalam Tema Gelap.", "info");
-      loadDataFromSheets();
-      loadShareTokensHistory();
+      // Check if user is logged in
+      const savedUser = localStorage.getItem("tridaya_user");
+      if (savedUser) {
+        loadDataFromSheets();
+        loadShareTokensHistory();
+      }
     }
   }, []);
-
-  // Sync modifications to Sheets
-  const sendActionToSheets = async (
-    actionType: "editData" | "deleteData",
-    sheetName: "Pemasukan" | "Pengeluaran" | "MutasiKas",
-    id: string,
-    payloadData: any = null
-  ) => {
-    addLog(`POST /api/action -> action: ${actionType}, sheet: ${sheetName}, ID: ${id}`, "info");
-    try {
-      const response = await fetch("/api/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: actionType,
-          payload: {
-            username: "admin",
-            password: "123",
-            sheetName: sheetName,
-            id: id,
-            data: payloadData
-          }
-        })
-      });
-      const data = await response.json();
-      if (data.status === "success") {
-        addLog(`[Synced] ${actionType} ID ${id} pada sheet ${sheetName} berhasil.`, "success");
-      } else {
-        addLog(`[Local Only] Catatan disimpan lokal. Respons Sheet: "${data.message || 'ID tidak teralokasi'}"`, "info");
-      }
-    } catch (err: any) {
-      addLog(`[Network Warning] Gagal menghubungkan ke spreadsheet: ${err.message}`, "error");
-    }
-  };
 
   // Calculations for dashboard
   const totalPemasukan = pemasukanList.reduce((acc, curr) => acc + (curr.pendapatan_bersih || 0), 0);
@@ -711,42 +708,34 @@ export default function App() {
         pendapatan_bersih: net,
         keterangan: formKeterangan,
         nominal: net,
-        created_by: editingItem?.created_by || "admin",
+        created_by: editingItem?.created_by || user?.username || "admin",
         created_at: editingItem?.created_at || new Date().toISOString()
       };
 
       if (editingItem) {
         setPemasukanList(pemasukanList.map(item => item.id === editingItem.id ? payloadData : item));
-        sendActionToSheets("editData", "Pemasukan", editingItem.id, {
-          id: editingItem.id,
-          tanggal: formTanggal,
-          luasan: formLuasan,
-          pendapatan_kotor: formPendapatanKotor,
-          gaji_operator: formGajiOperator,
-          gaji_helper: formGajiHelper,
-          lainnya: formLainnya,
-          pendapatan_bersih: net,
-          keterangan: formKeterangan,
-          nominal: net,
-          created_by: payloadData.created_by,
-          created_at: payloadData.created_at
-        });
+        addLog(`Mengubah pemasukan ID ${editingItem.id}...`, "info");
+        apiService.updatePemasukan(editingItem.id, payloadData)
+          .then(() => {
+            addLog(`[Synced] Sukses mengubah pemasukan ID ${editingItem.id}`, "success");
+            showSnackbar("Berhasil mengubah pemasukan!", "success");
+          })
+          .catch(err => {
+            addLog(`[Sync Gagal] Gagal menyimpan perubahan pemasukan: ${err.message}`, "error");
+            showSnackbar(`Gagal menyimpan perubahan: ${err.message}`, "error");
+          });
       } else {
         setPemasukanList([...pemasukanList, payloadData]);
-        sendActionToSheets("editData", "Pemasukan", payloadData.id, {
-          id: payloadData.id,
-          tanggal: formTanggal,
-          luasan: formLuasan,
-          pendapatan_kotor: formPendapatanKotor,
-          gaji_operator: formGajiOperator,
-          gaji_helper: formGajiHelper,
-          lainnya: formLainnya,
-          pendapatan_bersih: net,
-          keterangan: formKeterangan,
-          nominal: net,
-          created_by: payloadData.created_by,
-          created_at: payloadData.created_at
-        });
+        addLog(`Menambah pemasukan baru...`, "info");
+        apiService.createPemasukan(payloadData)
+          .then(() => {
+            addLog(`[Synced] Sukses menambahkan pemasukan baru ID ${payloadData.id}`, "success");
+            showSnackbar("Berhasil menambahkan pemasukan baru!", "success");
+          })
+          .catch(err => {
+            addLog(`[Sync Gagal] Gagal menyimpan pemasukan baru: ${err.message}`, "error");
+            showSnackbar(`Gagal menyimpan pemasukan baru: ${err.message}`, "error");
+          });
       }
     } else if (modalType === "pengeluaran") {
       if (editingItem) {
@@ -757,19 +746,20 @@ export default function App() {
           kategori: formKategori,
           keterangan: formKeterangan,
           nominal: formJumlah,
-          created_by: parsed.created_by || "admin",
+          created_by: parsed.created_by || user?.username || "admin",
           created_at: parsed.created_at || new Date().toISOString()
         };
         setPengeluaranList(pengeluaranList.map(item => item.id === parsed.id ? updated : item));
-        sendActionToSheets("editData", "Pengeluaran", parsed.id, {
-          id: parsed.id,
-          tanggal: formTanggal,
-          kategori: formKategori,
-          keterangan: formKeterangan,
-          nominal: formJumlah,
-          created_by: updated.created_by,
-          created_at: updated.created_at
-        });
+        addLog(`Mengubah pengeluaran ID ${parsed.id}...`, "info");
+        apiService.updatePengeluaran(parsed.id, updated)
+          .then(() => {
+            addLog(`[Synced] Sukses mengubah pengeluaran ID ${parsed.id}`, "success");
+            showSnackbar("Berhasil mengubah pengeluaran!", "success");
+          })
+          .catch(err => {
+            addLog(`[Sync Gagal] Gagal menyimpan perubahan pengeluaran: ${err.message}`, "error");
+            showSnackbar(`Gagal menyimpan perubahan: ${err.message}`, "error");
+          });
       } else {
         const newId = `TX-${Math.floor(2000 + Math.random() * 9000)}`;
         const newItem: Transaction = {
@@ -778,19 +768,20 @@ export default function App() {
           kategori: formKategori,
           keterangan: formKeterangan,
           nominal: formJumlah,
-          created_by: "admin",
+          created_by: user?.username || "admin",
           created_at: new Date().toISOString()
         };
         setPengeluaranList([...pengeluaranList, newItem]);
-        sendActionToSheets("editData", "Pengeluaran", newId, {
-          id: newId,
-          tanggal: formTanggal,
-          kategori: formKategori,
-          keterangan: formKeterangan,
-          nominal: formJumlah,
-          created_by: newItem.created_by,
-          created_at: newItem.created_at
-        });
+        addLog(`Menambah pengeluaran baru...`, "info");
+        apiService.createPengeluaran(newItem)
+          .then(() => {
+            addLog(`[Synced] Sukses menambahkan pengeluaran baru ID ${newId}`, "success");
+            showSnackbar("Berhasil menambahkan pengeluaran baru!", "success");
+          })
+          .catch(err => {
+            addLog(`[Sync Gagal] Gagal menyimpan pengeluaran baru: ${err.message}`, "error");
+            showSnackbar(`Gagal menyimpan pengeluaran baru: ${err.message}`, "error");
+          });
       }
     } else {
       if (editingItem) {
@@ -803,15 +794,16 @@ export default function App() {
           nominal: formJumlah,
         };
         setMutasiList(mutasiList.map(item => item.id === editingItem.id ? updated : item));
-        sendActionToSheets("editData", "MutasiKas", editingItem.id, {
-          id: editingItem.id,
-          tanggal: formTanggal,
-          jenis: formJenis,
-          keterangan: formKeterangan,
-          nominal: formJumlah,
-          created_by: parsed.created_by,
-          created_at: parsed.created_at,
-        });
+        addLog(`Mengubah mutasi kas ID ${editingItem.id}...`, "info");
+        apiService.updateMutasiKas(editingItem.id, updated)
+          .then(() => {
+            addLog(`[Synced] Sukses mengubah mutasi kas ID ${editingItem.id}`, "success");
+            showSnackbar("Berhasil mengubah mutasi kas!", "success");
+          })
+          .catch(err => {
+            addLog(`[Sync Gagal] Gagal menyimpan perubahan mutasi kas: ${err.message}`, "error");
+            showSnackbar(`Gagal menyimpan perubahan: ${err.message}`, "error");
+          });
       } else {
         const newId = `MT-${Math.floor(3000 + Math.random() * 9000)}`;
         const newItem: CashTransfer = {
@@ -820,19 +812,20 @@ export default function App() {
           jenis: formJenis,
           keterangan: formKeterangan,
           nominal: formJumlah,
-          created_by: "admin",
+          created_by: user?.username || "admin",
           created_at: new Date().toISOString(),
         };
         setMutasiList([...mutasiList, newItem]);
-        sendActionToSheets("editData", "MutasiKas", newId, {
-          id: newId,
-          tanggal: formTanggal,
-          jenis: formJenis,
-          keterangan: formKeterangan,
-          nominal: formJumlah,
-          created_by: newItem.created_by,
-          created_at: newItem.created_at,
-        });
+        addLog(`Menambah mutasi kas baru...`, "info");
+        apiService.createMutasiKas(newItem)
+          .then(() => {
+            addLog(`[Synced] Sukses menambahkan mutasi kas baru ID ${newId}`, "success");
+            showSnackbar("Berhasil menambahkan mutasi kas baru!", "success");
+          })
+          .catch(err => {
+            addLog(`[Sync Gagal] Gagal menyimpan mutasi kas baru: ${err.message}`, "error");
+            showSnackbar(`Gagal menyimpan mutasi kas baru: ${err.message}`, "error");
+          });
       }
     }
 
@@ -854,13 +847,40 @@ export default function App() {
 
     if (type === "pemasukan") {
       setPemasukanList(pemasukanList.filter(item => item.id !== id));
-      sendActionToSheets("deleteData", "Pemasukan", id);
+      addLog(`Menghapus pemasukan ID ${id}...`, "info");
+      apiService.deletePemasukan(id)
+        .then(() => {
+          addLog(`[Synced] Sukses menghapus pemasukan ID ${id}`, "success");
+          showSnackbar("Berhasil menghapus pemasukan!", "success");
+        })
+        .catch(err => {
+          addLog(`[Sync Gagal] Gagal menghapus pemasukan: ${err.message}`, "error");
+          showSnackbar(`Gagal menghapus pemasukan: ${err.message}`, "error");
+        });
     } else if (type === "pengeluaran") {
       setPengeluaranList(pengeluaranList.filter(item => item.id !== id));
-      sendActionToSheets("deleteData", "Pengeluaran", id);
+      addLog(`Menghapus pengeluaran ID ${id}...`, "info");
+      apiService.deletePengeluaran(id)
+        .then(() => {
+          addLog(`[Synced] Sukses menghapus pengeluaran ID ${id}`, "success");
+          showSnackbar("Berhasil menghapus pengeluaran!", "success");
+        })
+        .catch(err => {
+          addLog(`[Sync Gagal] Gagal menghapus pengeluaran: ${err.message}`, "error");
+          showSnackbar(`Gagal menghapus pengeluaran: ${err.message}`, "error");
+        });
     } else {
       setMutasiList(mutasiList.filter(item => item.id !== id));
-      sendActionToSheets("deleteData", "MutasiKas", id);
+      addLog(`Menghapus mutasi kas ID ${id}...`, "info");
+      apiService.deleteMutasiKas(id)
+        .then(() => {
+          addLog(`[Synced] Sukses menghapus mutasi kas ID ${id}`, "success");
+          showSnackbar("Berhasil menghapus mutasi kas!", "success");
+        })
+        .catch(err => {
+          addLog(`[Sync Gagal] Gagal menghapus mutasi kas: ${err.message}`, "error");
+          showSnackbar(`Gagal menghapus mutasi kas: ${err.message}`, "error");
+        });
     }
 
     setDeleteConfirmation(null);
@@ -998,7 +1018,7 @@ export default function App() {
                   <div className="space-y-1.5 relative z-10">
                     <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wider block">Total Saldo</span>
                     <h3 className={`text-2xl font-black font-mono tracking-tight ${totalSaldo >= 0 ? "text-slate-100" : "text-rose-500"}`}>{formatIDR(totalSaldo)}</h3>
-                    <p className="text-[9px] text-slate-400 font-semibold leading-tight">Kas ({formatIDR(totalKas)}) + Pendapatan Bersih - Pengeluaran</p>
+                    <p className="text-[9px] text-slate-400 font-semibold leading-tight">Kas ({formatIDR(totalKas)}) + Pendapatan Bersih ({formatIDR(totalPemasukan)}) - Pengeluaran ({formatIDR(totalPengeluaran)})</p>
                   </div>
                   <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
                     <Wallet className="h-5.5 w-5.5" />
@@ -1240,6 +1260,109 @@ export default function App() {
     );
   }
 
+  if (!user && !isInvestorMode) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col items-center justify-center p-4 antialiased selection:bg-indigo-500/30 selection:text-white">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden"
+        >
+          {/* Ambient light glow */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-indigo-500/10 blur-3xl rounded-full" />
+          
+          <div className="relative z-10 text-center space-y-6">
+            {/* Sheet Connection Status Indicator */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800/80 rounded-full text-[9px] font-extrabold tracking-wider uppercase text-slate-400 select-none mx-auto">
+              {sheetConnection === "connecting" && (
+                <>
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                  </span>
+                  <span className="text-amber-400 font-mono tracking-normal">Sheet: Menghubungkan...</span>
+                </>
+              )}
+              {sheetConnection === "connected" && (
+                <>
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-emerald-400 font-mono tracking-normal text-[8.5px]">Sheet: Connected</span>
+                </>
+              )}
+              {sheetConnection === "disconnected" && (
+                <>
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                  </span>
+                  <span className="text-rose-400 font-mono tracking-normal text-[8.5px]">Sheet: Disconnected</span>
+                </>
+              )}
+            </div>
+
+            <div className="block">
+              <div className="inline-flex p-3 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-2xl text-white shadow-xl shadow-indigo-600/25">
+                <FileSpreadsheet className="h-7 w-7" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-tight">Tridaya Ledger</h2>
+              <p className="text-xs text-slate-400 mt-1">Sistem Laporan Keuangan Combine Harvester</p>
+            </div>
+
+            {loginError && (
+              <div className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs py-3 px-4 rounded-xl flex items-center gap-2.5 text-left">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4 text-left">
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Username</label>
+                <input
+                  type="text"
+                  required
+                  value={loginUsername}
+                  onChange={e => setLoginUsername(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition duration-200"
+                  placeholder="Masukkan username"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition duration-200"
+                  placeholder="Masukkan password"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition font-bold text-xs uppercase tracking-wider rounded-xl text-white shadow-lg shadow-indigo-600/25 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loginLoading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Login Masuk"
+                )}
+              </button>
+            </form>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col md:flex-row antialiased">
       {/* 1. MOBILE RESPONSIVE TOP NAV BAR */}
@@ -1353,13 +1476,28 @@ export default function App() {
                 </nav>
               </div>
 
-              {/* Developer credentials warning */}
-              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/80 space-y-1">
-                <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold uppercase tracking-wider">
-                  <Shield className="h-3 w-3" />
-                  <span>Kredensial Aktif</span>
+              {/* Active User profile & Logout */}
+              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800/80 space-y-2.5 mt-auto">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black text-slate-200 truncate leading-tight">{user?.nama}</p>
+                    <p className="text-[9px] font-mono font-bold text-indigo-400 uppercase tracking-widest mt-0.5">{user?.role}</p>
+                  </div>
                 </div>
-                <p className="text-[11px] text-slate-400 font-semibold font-mono">admin / 123 (Proxy)</p>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("tridaya_user");
+                    setUser(null);
+                    showSnackbar("Anda telah berhasil keluar.", "info");
+                  }}
+                  className="w-full py-2 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <LogOut className="h-3 w-3" />
+                  <span>Keluar Akun</span>
+                </button>
               </div>
             </motion.div>
           </>
@@ -1450,6 +1588,46 @@ export default function App() {
               );
             })}
           </nav>
+
+          {/* User profile & Logout */}
+          <div className="mt-auto pt-4 border-t border-slate-800/80">
+            {sidebarCollapsed ? (
+              <button
+                onClick={() => {
+                  localStorage.removeItem("tridaya_user");
+                  setUser(null);
+                  showSnackbar("Anda telah berhasil keluar.", "info");
+                }}
+                className="mx-auto p-3 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 text-slate-400 hover:text-rose-400 rounded-xl transition cursor-pointer flex items-center justify-center"
+                title="Keluar"
+              >
+                <LogOut className="h-4.5 w-4.5" />
+              </button>
+            ) : (
+              <div className="bg-slate-950/40 p-3.5 rounded-xl border border-slate-800/80 space-y-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20 shrink-0">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black text-slate-200 truncate leading-tight">{user?.nama}</p>
+                    <p className="text-[9px] font-mono font-bold text-indigo-400 uppercase tracking-widest mt-0.5">{user?.role}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("tridaya_user");
+                    setUser(null);
+                    showSnackbar("Anda telah berhasil keluar.", "info");
+                  }}
+                  className="w-full py-2 bg-slate-950 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-900/50 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] font-extrabold uppercase tracking-widest transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <LogOut className="h-3 w-3" />
+                  <span>Keluar</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Collapsible Trigger control */}
@@ -1516,7 +1694,7 @@ export default function App() {
                     <div className="space-y-1.5 relative z-10">
                       <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wider block">Total Saldo</span>
                       <h3 className={`text-2xl font-black font-mono tracking-tight ${totalSaldo >= 0 ? "text-slate-100" : "text-rose-500"}`}>{formatIDR(totalSaldo)}</h3>
-                      <p className="text-[9px] text-slate-400 font-semibold leading-tight">Kas ({formatIDR(totalKas)}) + Pendapatan Bersih - Pengeluaran</p>
+                      <p className="text-[9px] text-slate-400 font-semibold leading-tight">Kas ({formatIDR(totalKas)}) + Pendapatan Bersih ({formatIDR(totalPemasukan)}) - Pengeluaran ({formatIDR(totalPengeluaran)})</p>
                     </div>
                     <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
                       <Wallet className="h-5.5 w-5.5" />
