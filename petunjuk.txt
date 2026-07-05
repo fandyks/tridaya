@@ -290,8 +290,13 @@ function handleGetInvestorDashboard(token) {
   var matchedToken = null;
   
   for (var i = 0; i < tokens.length; i++) {
-    if (tokens[i].token === token && tokens[i].status === "Aktif") {
-      matchedToken = tokens[i];
+    var t = tokens[i];
+    var tToken = t.token || t.Token || "";
+    var tStatus = String(t.status || t.Status || "").trim().toLowerCase();
+    
+    // Matched if token matches and status is either "aktif", empty, or "active" (resilient)
+    if (tToken === token && (tStatus === "aktif" || tStatus === "active" || tStatus === "")) {
+      matchedToken = t;
       break;
     }
   }
@@ -378,7 +383,15 @@ function createRecord(sheetName, recordData, idPrefix) {
   
   for (var i = 0; i < headers.length; i++) {
     var key = headers[i];
-    newRow.push(recordData[key] !== undefined ? recordData[key] : "");
+    var foundVal = "";
+    var normalizedKey = String(key).trim().toLowerCase().replace(/[\s_]+/g, "");
+    for (var rKey in recordData) {
+      if (rKey.toLowerCase().replace(/[\s_]+/g, "") === normalizedKey) {
+        foundVal = recordData[rKey];
+        break;
+      }
+    }
+    newRow.push(foundVal !== undefined ? foundVal : "");
   }
   
   sheet.appendRow(newRow);
@@ -406,8 +419,16 @@ function updateRecord(sheetName, id, recordData) {
   
   for (var j = 0; j < headers.length; j++) {
     var key = headers[j];
-    if (recordData[key] !== undefined) {
-      sheet.getRange(rowIndex, j + 1).setValue(recordData[key]);
+    var normalizedKey = String(key).trim().toLowerCase().replace(/[\s_]+/g, "");
+    var foundVal = undefined;
+    for (var rKey in recordData) {
+      if (rKey.toLowerCase().replace(/[\s_]+/g, "") === normalizedKey) {
+        foundVal = recordData[rKey];
+        break;
+      }
+    }
+    if (foundVal !== undefined) {
+      sheet.getRange(rowIndex, j + 1).setValue(foundVal);
     }
   }
   return { id: id, status: "updated" };
@@ -478,7 +499,7 @@ function handleGenerateShareToken() {
   var payload = {
     token: token,
     status: "Aktif",
-    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 hari kedaluwarsa
+    expires_at: "Never", // Never Expired - Silakan hapus baris di Spreadsheet jika ingin menonaktifkan
     created_by: "admin"
   };
   
@@ -492,7 +513,11 @@ function handleValidateShareToken(token) {
   var valid = false;
   
   for (var i = 0; i < tokens.length; i++) {
-    if (tokens[i].token === token && tokens[i].status === "Aktif") {
+    var t = tokens[i];
+    var tToken = t.token || t.Token || "";
+    var tStatus = String(t.status || t.Status || "").trim().toLowerCase();
+    
+    if (tToken === token && (tStatus === "aktif" || tStatus === "active" || tStatus === "")) {
       valid = true;
       break;
     }

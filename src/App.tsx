@@ -367,6 +367,42 @@ export default function App() {
     };
   };
 
+  // Helper to parse any object safely as a ShareToken structure
+  const parseShareTokenItem = (item: any) => {
+    const getVal = (keys: string[], defaultVal: any = "") => {
+      for (const key of keys) {
+        if (item[key] !== undefined && item[key] !== null) return item[key];
+        const normalizedKey = key.toLowerCase().replace(/[\s_]+/g, "");
+        for (const itemKey of Object.keys(item)) {
+          if (itemKey.toLowerCase().replace(/[\s_]+/g, "") === normalizedKey) {
+            return item[itemKey];
+          }
+        }
+      }
+      return defaultVal;
+    };
+
+    const id = String(getVal(["id", "Id", "ID"], `SHR-${Math.floor(1000 + Math.random() * 9000)}`));
+    const token = String(getVal(["token", "Token"], ""));
+    const rawStatus = String(getVal(["status", "Status"], "")).trim().toLowerCase();
+    
+    // Default empty status, "aktif" or "active" to "Aktif"
+    const status = (rawStatus === "nonaktif" || rawStatus === "inactive") ? "Nonaktif" : "Aktif";
+    
+    const expires_at = String(getVal(["expires_at", "Expires At", "expired_at", "Expired At"], "Never"));
+    const created_at = String(getVal(["created_at", "createdAt", "Created At"], new Date().toISOString()));
+    const created_by = String(getVal(["created_by", "createdBy", "Created By"], "admin"));
+
+    return {
+      id,
+      token,
+      status,
+      expires_at,
+      created_at,
+      created_by
+    };
+  };
+
   // Logger helper
   const addLog = (text: string, type: "info" | "success" | "error" = "info") => {
     const time = new Date().toLocaleTimeString("id-ID", { hour12: false });
@@ -456,15 +492,18 @@ export default function App() {
     try {
       const data = await apiService.getShareTokens();
       if (Array.isArray(data)) {
-        // Filter out headers or invalid empty rows
-        const cleaned = data.filter((row: any) => row.id && row.token);
+        // Parse and clean tokens history
+        const cleaned = data
+          .map(row => parseShareTokenItem(row))
+          .filter((row: any) => row.id && row.token);
+        
         // Sort by created_at descending
         const sorted = [...cleaned].sort((a: any, b: any) => {
           return (b.created_at || "").localeCompare(a.created_at || "");
         });
         setShareTokensHistory(sorted);
         // Find if there is an active one
-        const active = cleaned.find((row: any) => (row.expires_at === "Aktif" || row.expired_at === "Aktif"));
+        const active = cleaned.find((row: any) => row.status === "Aktif");
         if (active) {
           setGeneratedToken(active.token);
         }
@@ -503,7 +542,7 @@ export default function App() {
 
   const handleCopyLink = () => {
     if (!generatedToken) return;
-    const shareUrl = `${window.location.origin}/share?token=${generatedToken}`;
+    const shareUrl = `${window.location.origin}/?token=${generatedToken}`;
     navigator.clipboard.writeText(shareUrl)
       .then(() => {
         setCopiedSuccess(true);
@@ -2338,7 +2377,7 @@ export default function App() {
                           <input
                             type="text"
                             readOnly
-                            value={`${window.location.origin}/share?token=${generatedToken}`}
+                            value={`${window.location.origin}/?token=${generatedToken}`}
                             className="flex-1 px-4 py-3 bg-slate-900 border border-slate-800 text-slate-200 font-mono text-xs rounded-xl focus:outline-none font-bold"
                           />
                           <button
@@ -2416,12 +2455,12 @@ export default function App() {
                               <td className="p-4">
                                 <span
                                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                                    item.expires_at === "Aktif"
+                                    item.status === "Aktif"
                                       ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
                                       : "bg-slate-800 text-slate-400 border border-slate-700/50"
                                   }`}
                                 >
-                                  {item.expires_at === "Aktif" ? "Aktif" : "Nonaktif"}
+                                  {item.status === "Aktif" ? "Aktif" : "Nonaktif"}
                                 </span>
                               </td>
                               <td className="p-4 text-slate-400 font-mono text-[10px]">
