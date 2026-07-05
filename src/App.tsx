@@ -53,6 +53,7 @@ import {
   Pie
 } from "recharts";
 import { Transaction, CashTransfer, Category, Pemasukan } from "./types";
+import { TridayaLogo } from "./components/TridayaLogo";
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: "CAT-01", nama: "Gaji & Pendapatan", tipe: "pemasukan", warna: "emerald" },
@@ -1132,8 +1133,8 @@ export default function App() {
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-800 pb-6">
             <div className="flex items-center gap-3.5">
-              <div className="p-3 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-2xl text-white shadow-xl shadow-indigo-600/10 shrink-0">
-                <Globe className="h-6 w-6" />
+              <div className="p-1 bg-slate-900/60 rounded-2xl border border-slate-800/80 text-white shadow-xl shrink-0">
+                <TridayaLogo size={44} className="h-11 w-11" />
               </div>
               <div>
                 <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-black block">Portal Investor Tridaya</span>
@@ -1536,8 +1537,8 @@ export default function App() {
             </div>
 
             <div className="block">
-              <div className="inline-flex p-3 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-2xl text-white shadow-xl shadow-indigo-600/25">
-                <FileSpreadsheet className="h-7 w-7" />
+              <div className="inline-flex p-1.5 bg-slate-900/60 rounded-2xl border border-slate-800/80 text-white shadow-xl">
+                <TridayaLogo size={64} className="h-16 w-16" />
               </div>
             </div>
             <div>
@@ -1600,8 +1601,8 @@ export default function App() {
       {/* 1. MOBILE RESPONSIVE TOP NAV BAR */}
       <div className="md:hidden w-full bg-slate-900 border-b border-slate-800 px-4 py-3.5 sticky top-0 z-50 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-lg text-white shadow-lg">
-            <FileSpreadsheet className="h-5 w-5" />
+          <div className="p-0.5 bg-slate-950 rounded-lg border border-slate-800 text-white shadow-lg">
+            <TridayaLogo size={32} className="h-8 w-8" />
           </div>
           <div>
             <h1 className="text-sm font-extrabold tracking-tight">Tridaya</h1>
@@ -1651,8 +1652,8 @@ export default function App() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-md">
-                      <FileSpreadsheet className="h-5 w-5" />
+                    <div className="p-1 bg-slate-950 rounded-xl border border-slate-800 text-white shadow-md">
+                      <TridayaLogo size={36} className="h-9 w-9" />
                     </div>
                     <div>
                       <h2 className="text-md font-extrabold tracking-tight">Tridaya</h2>
@@ -1752,8 +1753,8 @@ export default function App() {
                   exit={{ opacity: 0, x: -10 }}
                   className="flex items-center gap-2.5"
                 >
-                  <div className="p-2.5 bg-gradient-to-tr from-indigo-600 to-indigo-500 rounded-xl text-white shadow-lg shadow-indigo-600/20">
-                    <FileSpreadsheet className="h-5 w-5" />
+                  <div className="p-1 bg-slate-950 rounded-xl border border-slate-800 text-white shadow-lg">
+                    <TridayaLogo size={36} className="h-9 w-9" />
                   </div>
                   <div>
                     <h2 className="text-sm font-extrabold tracking-tight">Tridaya Online Report</h2>
@@ -1764,8 +1765,8 @@ export default function App() {
             </AnimatePresence>
 
             {sidebarCollapsed && (
-              <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg mx-auto">
-                <FileSpreadsheet className="h-5 w-5" />
+              <div className="p-1 bg-slate-950 rounded-xl border border-slate-800 text-white shadow-lg mx-auto">
+                <TridayaLogo size={36} className="h-9 w-9" />
               </div>
             )}
           </div>
