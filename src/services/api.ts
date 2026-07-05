@@ -1,6 +1,7 @@
 import { Pemasukan, Transaction, CashTransfer } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "https://script.google.com/macros/s/AKfycbxBtoDOgKJYlO2IMV928Q0nhxVzzYN1eqvHKcfxP-4f3QyqwhaVWgTQy_ZkrclPalT50g/exec";
+// const BASE_URL = "https://script.google.com/macros/s/AKfycbxBtoDOgKJYlO2IMV9zYN1eqvHKcfxP-4f3QyqwhaVWgTQy_ZkrclPalT50g/exec";
 
 // Simple helper to perform GET requests
 async function getRequest(action: string, extraParams: Record<string, string> = {}) {

@@ -148,21 +148,10 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
   const [connectionMessage, setConnectionMessage] = useState<string>("Sistem diinisialisasi dalam Tema Gelap.");
 
-  // Data states (fallback to LocalStorage if sheets notice / empty)
-  const [pemasukanList, setPemasukanList] = useState<Pemasukan[]>(() => {
-    const saved = localStorage.getItem("tridaya_pemasukan");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [pengeluaranList, setPengeluaranList] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem("tridaya_pengeluaran");
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [mutasiList, setMutasiList] = useState<CashTransfer[]>(() => {
-    const saved = localStorage.getItem("tridaya_mutasi");
-    return saved ? JSON.parse(saved) : [];
-  });
+  // Data states (Google Sheets)
+  const [pemasukanList, setPemasukanList] = useState<Pemasukan[]>([]);
+  const [pengeluaranList, setPengeluaranList] = useState<Transaction[]>([]);
+  const [mutasiList, setMutasiList] = useState<CashTransfer[]>([]);
 
   const [categoriesList] = useState<Category[]>(DEFAULT_CATEGORIES);
 
@@ -384,19 +373,6 @@ export default function App() {
     setSyncLogs(prev => [{ id: Math.random().toString(), time, type, text }, ...prev].slice(0, 40));
   };
 
-  // Sync to local storage as fallback/cache
-  useEffect(() => {
-    localStorage.setItem("tridaya_pemasukan", JSON.stringify(pemasukanList));
-  }, [pemasukanList]);
-
-  useEffect(() => {
-    localStorage.setItem("tridaya_pengeluaran", JSON.stringify(pengeluaranList));
-  }, [pengeluaranList]);
-
-  useEffect(() => {
-    localStorage.setItem("tridaya_mutasi", JSON.stringify(mutasiList));
-  }, [mutasiList]);
-
   // Load and sync sheet data on mount & refresh
   const loadDataFromSheets = async () => {
     setSyncStatus("syncing");
@@ -426,9 +402,12 @@ export default function App() {
         const parsedList = data.map((item: any) => parsePemasukanItem(item));
         setPemasukanList(parsedList);
         addLog(`Berhasil memuat ${data.length} baris data Pemasukan.`, "success");
+      } else {
+        setPemasukanList([]);
       }
     } catch (err: any) {
-      addLog(`API Pemasukan offline: ${err.message}. Memuat cadangan lokal.`, "info");
+      setPemasukanList([]);
+      addLog(`API Pemasukan offline: ${err.message}. Data dikosongkan.`, "error");
       showSnackbar(`Pemasukan: ${err.message}`, "error");
     }
 
@@ -439,9 +418,12 @@ export default function App() {
         const parsedList = data.map((item: any) => parsePengeluaranItem(item));
         setPengeluaranList(parsedList);
         addLog(`Berhasil memuat ${data.length} baris data Pengeluaran.`, "success");
+      } else {
+        setPengeluaranList([]);
       }
     } catch (err: any) {
-      addLog(`API Pengeluaran offline: ${err.message}. Memuat cadangan lokal.`, "info");
+      setPengeluaranList([]);
+      addLog(`API Pengeluaran offline: ${err.message}. Data dikosongkan.`, "error");
       showSnackbar(`Pengeluaran: ${err.message}`, "error");
     }
 
@@ -452,9 +434,12 @@ export default function App() {
         const parsedList = data.map((item: any) => parseMutasiItem(item));
         setMutasiList(parsedList);
         addLog(`Berhasil memuat ${data.length} baris data MutasiKas.`, "success");
+      } else {
+        setMutasiList([]);
       }
     } catch (err: any) {
-      addLog(`API MutasiKas offline: ${err.message}. Memuat cadangan lokal.`, "info");
+      setMutasiList([]);
+      addLog(`API MutasiKas offline: ${err.message}. Data dikosongkan.`, "error");
       showSnackbar(`Mutasi Kas: ${err.message}`, "error");
     }
 
@@ -583,6 +568,11 @@ export default function App() {
       setInvestorError("Link tidak valid atau telah kedaluwarsa.");
     } else {
       addLog("Aplikasi diinisialisasi dalam Tema Gelap.", "info");
+      // Clean up old local transaction storage keys so no backup is kept
+      localStorage.removeItem("tridaya_pemasukan");
+      localStorage.removeItem("tridaya_pengeluaran");
+      localStorage.removeItem("tridaya_mutasi");
+      
       // Check if user is logged in
       const savedUser = localStorage.getItem("tridaya_user");
       if (savedUser) {
@@ -891,22 +881,62 @@ export default function App() {
     const datesMap: { [key: string]: { tanggal: string; pemasukan: number; pengeluaran: number; luasan: number } } = {};
 
     pemasukanList.forEach(item => {
-      if (!datesMap[item.tanggal]) {
-        datesMap[item.tanggal] = { tanggal: item.tanggal, pemasukan: 0, pengeluaran: 0, luasan: 0 };
+      if (item && item.tanggal) {
+        if (!datesMap[item.tanggal]) {
+          datesMap[item.tanggal] = { tanggal: item.tanggal, pemasukan: 0, pengeluaran: 0, luasan: 0 };
+        }
+        datesMap[item.tanggal].pemasukan += item.pendapatan_bersih || 0;
+        datesMap[item.tanggal].luasan += Number(item.luasan) || 0;
       }
-      datesMap[item.tanggal].pemasukan += item.pendapatan_bersih || 0;
-      datesMap[item.tanggal].luasan += Number(item.luasan) || 0;
     });
 
     pengeluaranList.forEach(item => {
       const parsed = parsePengeluaranItem(item);
-      if (!datesMap[parsed.tanggal]) {
-        datesMap[parsed.tanggal] = { tanggal: parsed.tanggal, pemasukan: 0, pengeluaran: 0, luasan: 0 };
+      if (parsed && parsed.tanggal) {
+        if (!datesMap[parsed.tanggal]) {
+          datesMap[parsed.tanggal] = { tanggal: parsed.tanggal, pemasukan: 0, pengeluaran: 0, luasan: 0 };
+        }
+        datesMap[parsed.tanggal].pengeluaran += parsed.nominal || 0;
       }
-      datesMap[parsed.tanggal].pengeluaran += parsed.nominal || 0;
     });
 
-    return Object.values(datesMap).sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+    // Find the latest date to determine the end of our 15-day window.
+    // We default to the current system date, but check if there's any later date in the dataset.
+    let endDate = new Date();
+    
+    const existingDates = Object.keys(datesMap);
+    if (existingDates.length > 0) {
+      existingDates.sort();
+      const lastDateStr = existingDates[existingDates.length - 1];
+      const parts = lastDateStr.split("-");
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const maxDateInDataset = new Date(year, month, day);
+        if (maxDateInDataset > endDate) {
+          endDate = maxDateInDataset;
+        }
+      }
+    }
+
+    // Generate exactly 15 consecutive days ending at endDate
+    const chartData = [];
+    for (let i = 14; i >= 0; i--) {
+      const d = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() - i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      
+      if (datesMap[dateStr]) {
+        chartData.push(datesMap[dateStr]);
+      } else {
+        chartData.push({ tanggal: dateStr, pemasukan: 0, pengeluaran: 0, luasan: 0 });
+      }
+    }
+
+    return chartData;
   };
 
   const getCategoryBreakdown = (type: "pemasukan" | "pengeluaran") => {
@@ -1159,6 +1189,32 @@ export default function App() {
                       </>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Daily Area Chart (Tren Luasan Harian) for Investor View */}
+              <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
+                <div>
+                  <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
+                  <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                </div>
+                <div className="h-64 w-full text-xs">
+                  {getChartData().length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-slate-500">
+                      Tidak ada catatan pemasukan untuk menampilkan grafik luasan.
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
+                        <YAxis stroke="#64748b" />
+                        <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => [`${Number(value).toLocaleString("id-ID")} bahu`, "Total Luasan"]} />
+                        <Legend />
+                        <Bar dataKey="luasan" name="Total Luasan (Bahu)" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
 
