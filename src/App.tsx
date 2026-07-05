@@ -136,6 +136,12 @@ export default function App() {
   const [pengeluaranPage, setPengeluaranPage] = useState<number>(1);
   const [investorPage, setInvestorPage] = useState<number>(1);
 
+  // Chart Range states
+  const [dashboardCashFlowRange, setDashboardCashFlowRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
+  const [dashboardAcreageRange, setDashboardAcreageRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
+  const [investorCashFlowRange, setInvestorCashFlowRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
+  const [investorAcreageRange, setInvestorAcreageRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
+
   // Share & Investor states
   const [isInvestorMode, setIsInvestorMode] = useState<boolean>(false);
   const [investorToken, setInvestorToken] = useState<string | null>(null);
@@ -984,7 +990,7 @@ export default function App() {
   };
 
   // Recharts analytic transformers
-  const getChartData = () => {
+  const getChartData = (range: "1_minggu" | "1_bulan" | "semua" = "1_bulan") => {
     const datesMap: { [key: string]: { tanggal: string; pemasukan: number; pengeluaran: number; luasan: number } } = {};
 
     pemasukanList.forEach(item => {
@@ -1007,8 +1013,7 @@ export default function App() {
       }
     });
 
-    // Find the latest date to determine the end of our 15-day window.
-    // We default to the current system date, but check if there's any later date in the dataset.
+    // Find the latest date to determine the end of our window.
     let endDate = new Date();
     
     const existingDates = Object.keys(datesMap);
@@ -1027,9 +1032,33 @@ export default function App() {
       }
     }
 
-    // Generate exactly 15 consecutive days ending at endDate
+    let daysToGenerate = 30; // default for 1_bulan
+    if (range === "1_minggu") {
+      daysToGenerate = 7;
+    } else if (range === "1_bulan") {
+      daysToGenerate = 30;
+    } else if (range === "semua") {
+      if (existingDates.length > 0) {
+        const firstDateStr = existingDates[0];
+        const parts = firstDateStr.split("-");
+        if (parts.length === 3) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const day = parseInt(parts[2], 10);
+          const minDateInDataset = new Date(year, month, day);
+          const diffTime = Math.abs(endDate.getTime() - minDateInDataset.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          daysToGenerate = Math.max(15, diffDays + 1); // generate at least 15 days
+        } else {
+          daysToGenerate = 30;
+        }
+      } else {
+        daysToGenerate = 30;
+      }
+    }
+
     const chartData = [];
-    for (let i = 14; i >= 0; i--) {
+    for (let i = daysToGenerate - 1; i >= 0; i--) {
       const d = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() - i);
       const yyyy = d.getFullYear();
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1212,18 +1241,29 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: Trend line */}
                 <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 lg:col-span-2 space-y-4">
-                  <div>
-                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Tren Aliran Kas Harian</h4>
-                    <p className="text-[11px] text-slate-500">Visualisasi pemasukan and pengeluaran harian</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Tren Aliran Kas Harian</h4>
+                      <p className="text-[11px] text-slate-500">Visualisasi pemasukan and pengeluaran harian</p>
+                    </div>
+                    <select
+                      value={dashboardCashFlowRange}
+                      onChange={(e) => setDashboardCashFlowRange(e.target.value as any)}
+                      className="bg-slate-950 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      <option value="1_minggu">1 Minggu</option>
+                      <option value="1_bulan">1 Bulan</option>
+                      <option value="semua">Semua</option>
+                    </select>
                   </div>
                   <div className="h-72 w-full text-xs">
-                    {getChartData().length === 0 ? (
+                    {getChartData(dashboardCashFlowRange).length === 0 ? (
                       <div className="h-full flex items-center justify-center text-slate-500">
                         Tidak ada catatan transaksi untuk ditampilkan.
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <AreaChart data={getChartData(dashboardCashFlowRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorPms" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -1301,18 +1341,29 @@ export default function App() {
 
               {/* Daily Area Chart (Tren Luasan Harian) for Investor View */}
               <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
-                <div>
-                  <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
-                  <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
+                    <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                  </div>
+                  <select
+                    value={dashboardAcreageRange}
+                    onChange={(e) => setDashboardAcreageRange(e.target.value as any)}
+                    className="bg-slate-950 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="1_minggu">1 Minggu</option>
+                    <option value="1_bulan">1 Bulan</option>
+                    <option value="semua">Semua</option>
+                  </select>
                 </div>
                 <div className="h-64 w-full text-xs">
-                  {getChartData().length === 0 ? (
+                  {getChartData(dashboardAcreageRange).length === 0 ? (
                     <div className="h-full flex items-center justify-center text-slate-500">
                       Tidak ada catatan pemasukan untuk menampilkan grafik luasan.
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <BarChart data={getChartData(dashboardAcreageRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                         <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
                         <YAxis stroke="#64748b" />
@@ -1929,18 +1980,29 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left: Trend line */}
                   <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 lg:col-span-2 space-y-4">
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Tren Aliran Kas Harian</h4>
-                      <p className="text-[11px] text-slate-500">Visualisasi pemasukan dan pengeluaran harian</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Tren Aliran Kas Harian</h4>
+                        <p className="text-[11px] text-slate-500">Visualisasi pemasukan dan pengeluaran harian</p>
+                      </div>
+                      <select
+                        value={investorCashFlowRange}
+                        onChange={(e) => setInvestorCashFlowRange(e.target.value as any)}
+                        className="bg-slate-950 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                      >
+                        <option value="1_minggu">1 Minggu</option>
+                        <option value="1_bulan">1 Laporan (1 Bulan)</option>
+                        <option value="semua">Semua</option>
+                      </select>
                     </div>
                     <div className="h-72 w-full text-xs">
-                      {getChartData().length === 0 ? (
+                      {getChartData(investorCashFlowRange).length === 0 ? (
                         <div className="h-full flex items-center justify-center text-slate-500">
                           Tidak ada catatan transaksi untuk ditampilkan.
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <AreaChart data={getChartData(investorCashFlowRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
                               <linearGradient id="colorPms" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -2018,18 +2080,29 @@ export default function App() {
 
                 {/* Daily Area Chart (Tren Luasan Harian) */}
                 <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
-                  <div>
-                    <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
-                    <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
+                      <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                    </div>
+                    <select
+                      value={investorAcreageRange}
+                      onChange={(e) => setInvestorAcreageRange(e.target.value as any)}
+                      className="bg-slate-950 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    >
+                      <option value="1_minggu">1 Minggu</option>
+                      <option value="1_bulan">1 Bulan</option>
+                      <option value="semua">Semua</option>
+                    </select>
                   </div>
                   <div className="h-64 w-full text-xs">
-                    {getChartData().length === 0 ? (
+                    {getChartData(investorAcreageRange).length === 0 ? (
                       <div className="h-full flex items-center justify-center text-slate-500">
                         Tidak ada catatan pemasukan untuk menampilkan grafik luasan.
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <BarChart data={getChartData(investorAcreageRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                           <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
                           <YAxis stroke="#64748b" />
