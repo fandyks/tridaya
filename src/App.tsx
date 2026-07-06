@@ -138,10 +138,10 @@ export default function App() {
   const [investorPage, setInvestorPage] = useState<number>(1);
 
   // Chart Range states
-  const [dashboardCashFlowRange, setDashboardCashFlowRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
-  const [dashboardAcreageRange, setDashboardAcreageRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
-  const [investorCashFlowRange, setInvestorCashFlowRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
-  const [investorAcreageRange, setInvestorAcreageRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_bulan");
+  const [dashboardCashFlowRange, setDashboardCashFlowRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_minggu");
+  const [dashboardAcreageRange, setDashboardAcreageRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_minggu");
+  const [investorCashFlowRange, setInvestorCashFlowRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_minggu");
+  const [investorAcreageRange, setInvestorAcreageRange] = useState<"1_minggu" | "1_bulan" | "semua">("1_minggu");
 
   // Share & Investor states
   const [isInvestorMode, setIsInvestorMode] = useState<boolean>(false);
@@ -708,6 +708,21 @@ export default function App() {
     }).format(num);
   };
 
+  const formatCompact = (num: number) => {
+    if (num === 0) return "0";
+    const absNum = Math.abs(num);
+    if (absNum >= 1_000_000_000) {
+      return (num / 1_000_000_000).toFixed(absNum % 1_000_000_000 === 0 ? 0 : 1).replace(".", ",") + "M";
+    }
+    if (absNum >= 1_000_000) {
+      return (num / 1_000_000).toFixed(absNum % 1_000_000 === 0 ? 0 : 1).replace(".", ",") + "Jt";
+    }
+    if (absNum >= 1_000) {
+      return (num / 1_000).toFixed(absNum % 1_000 === 0 ? 0 : 1).replace(".", ",") + "K";
+    }
+    return num.toString().replace(".", ",");
+  };
+
   // Reset Form state
   const resetForm = () => {
     const today = new Date().toISOString().split("T")[0];
@@ -1014,6 +1029,61 @@ export default function App() {
       }
     });
 
+    // Compute cumulative running balance for "kas" across all historical dates
+    const dailyPms: { [date: string]: number } = {};
+    const dailyPgl: { [date: string]: number } = {};
+    const dailyMts: { [date: string]: number } = {};
+
+    pemasukanList.forEach(item => {
+      if (item?.tanggal) {
+        dailyPms[item.tanggal] = (dailyPms[item.tanggal] || 0) + (item.pendapatan_bersih || 0);
+      }
+    });
+    pengeluaranList.forEach(item => {
+      const parsed = parsePengeluaranItem(item);
+      if (parsed?.tanggal) {
+        dailyPgl[parsed.tanggal] = (dailyPgl[parsed.tanggal] || 0) + (parsed.nominal || 0);
+      }
+    });
+    mutasiList.forEach(item => {
+      const parsed = parseMutasiItem(item);
+      if (parsed?.tanggal) {
+        dailyMts[parsed.tanggal] = (dailyMts[parsed.tanggal] || 0) + (parsed.jenis === "Deposit" ? (parsed.nominal || 0) : -(parsed.nominal || 0));
+      }
+    });
+
+    const allSystemDatesSet = new Set<string>([
+      ...Object.keys(dailyPms),
+      ...Object.keys(dailyPgl),
+      ...Object.keys(dailyMts)
+    ]);
+    const sortedAllSystemDates = Array.from(allSystemDatesSet).sort();
+
+    const runningBalanceMap: { [dateStr: string]: number } = {};
+    let currentBalance = 0;
+    sortedAllSystemDates.forEach(dateStr => {
+      const pms = dailyPms[dateStr] || 0;
+      const pgl = dailyPgl[dateStr] || 0;
+      const mts = dailyMts[dateStr] || 0;
+      currentBalance += (pms - pgl + mts);
+      runningBalanceMap[dateStr] = currentBalance;
+    });
+
+    const getBalanceAtDate = (dateStr: string): number => {
+      if (runningBalanceMap[dateStr] !== undefined) {
+        return runningBalanceMap[dateStr];
+      }
+      let lastBal = 0;
+      for (const d of sortedAllSystemDates) {
+        if (d <= dateStr) {
+          lastBal = runningBalanceMap[d];
+        } else {
+          break;
+        }
+      }
+      return lastBal;
+    };
+
     // Find the latest date to determine the end of our window.
     let endDate = new Date();
     
@@ -1066,10 +1136,11 @@ export default function App() {
       const dd = String(d.getDate()).padStart(2, '0');
       const dateStr = `${yyyy}-${mm}-${dd}`;
       
+      const balance = getBalanceAtDate(dateStr);
       if (datesMap[dateStr]) {
-        chartData.push(datesMap[dateStr]);
+        chartData.push({ ...datesMap[dateStr], kas: balance });
       } else {
-        chartData.push({ tanggal: dateStr, pemasukan: 0, pengeluaran: 0, luasan: 0 });
+        chartData.push({ tanggal: dateStr, pemasukan: 0, pengeluaran: 0, luasan: 0, kas: balance });
       }
     }
 
@@ -1264,7 +1335,7 @@ export default function App() {
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={getChartData(dashboardCashFlowRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <AreaChart data={getChartData(dashboardCashFlowRange)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorPms" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -1274,14 +1345,19 @@ export default function App() {
                               <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
                               <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
                             </linearGradient>
+                            <linearGradient id="colorKas" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
+                              <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                            </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                           <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                          <YAxis stroke="#64748b" />
-                          <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} />
+                          <YAxis stroke="#64748b" tickFormatter={formatCompact} domain={[(dataMin: number) => (dataMin < 0 ? dataMin * 1.1 : 0), 'auto']} />
+                          <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => formatIDR(Number(value))} />
                           <Legend />
                           <Area type="monotone" dataKey="pemasukan" name="Pemasukan" stroke="#10b981" fillOpacity={1} fill="url(#colorPms)" strokeWidth={2.5} />
                           <Area type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#f43f5e" fillOpacity={1} fill="url(#colorPgl)" strokeWidth={2.5} />
+                          <Area type="monotone" dataKey="kas" name="Kas (Saldo)" stroke="#eab308" fillOpacity={1} fill="url(#colorKas)" strokeWidth={2.5} />
                         </AreaChart>
                       </ResponsiveContainer>
                     )}
@@ -1364,10 +1440,10 @@ export default function App() {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={getChartData(dashboardAcreageRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <BarChart data={getChartData(dashboardAcreageRange)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                         <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                        <YAxis stroke="#64748b" />
+                        <YAxis stroke="#64748b" tickFormatter={formatCompact} />
                         <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => [`${Number(value).toLocaleString("id-ID")} bahu`, "Total Luasan"]} />
                         <Legend />
                         <Bar dataKey="luasan" name="Total Luasan (Bahu)" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
@@ -1599,18 +1675,28 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col md:flex-row antialiased">
       {/* 1. MOBILE RESPONSIVE TOP NAV BAR */}
-      <div className="md:hidden w-full bg-slate-900 border-b border-slate-800 px-4 py-3.5 sticky top-0 z-50 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="p-0.5 bg-slate-950 rounded-lg border border-slate-800 text-white shadow-lg">
-            <TridayaLogo size={32} className="h-8 w-8" />
-          </div>
-          <div>
-            <h1 className="text-sm font-extrabold tracking-tight">Tridaya</h1>
-            <p className="text-[10px] text-indigo-400 font-medium">Buku Keuangan Combine Harvester</p>
+      <div className="md:hidden w-full bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-50 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Hamburger Menu Toggle */}
+          <button
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            className="p-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition active:scale-95"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          <div className="flex items-center gap-2">
+            <div className="p-0.5 bg-slate-950 rounded-lg border border-slate-800 text-white shadow-lg">
+              <TridayaLogo size={32} className="h-8 w-8" />
+            </div>
+            <div>
+              <h1 className="text-sm font-extrabold tracking-tight">Tridaya</h1>
+              <p className="text-[10px] text-indigo-400 font-medium">Buku Keuangan Combine Harvester</p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div>
           {/* Refresh/Sync button */}
           <button
             onClick={loadDataFromSheets}
@@ -1619,14 +1705,6 @@ export default function App() {
             title="SINKRONISASI"
           >
             <RefreshCw className={`h-4 w-4 ${syncStatus === "syncing" ? "animate-spin text-indigo-400" : ""}`} />
-          </button>
-          
-          {/* Hamburger Menu Toggle */}
-          <button
-            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            className="p-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition active:scale-95"
-          >
-            <Menu className="h-5 w-5" />
           </button>
         </div>
       </div>
@@ -1861,14 +1939,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* Collapsible Trigger control */}
-        <button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="absolute right-0 bottom-6 bg-slate-800 border-y border-l border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white p-1.5 rounded-l-lg transition focus:outline-none"
-        >
-          {sidebarCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-        </button>
       </motion.div>
+
+      {/* Collapsible Trigger control (Fixed in Center Vertically on PC/Tablet) */}
+      <motion.button
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        animate={{ left: sidebarCollapsed ? "5.5rem" : "18rem" }}
+        transition={{ type: "spring", damping: 20, stiffness: 180 }}
+        style={{ transform: "translate(-50%, -50%)" }}
+        className="hidden md:flex fixed top-1/2 z-40 bg-slate-800 border border-slate-700 hover:bg-indigo-600 hover:border-indigo-500 text-slate-300 hover:text-white p-1.5 rounded-full shadow-xl transition-colors focus:outline-none items-center justify-center cursor-pointer"
+        title={sidebarCollapsed ? "Tampilkan Sidebar" : "Sembunyikan Sidebar"}
+      >
+        {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </motion.button>
 
       {/* 3. MAIN WORKSPACE */}
       <main className="flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-8">
@@ -1992,7 +2075,7 @@ export default function App() {
                         className="bg-slate-950 border border-slate-800 text-slate-300 text-[11px] font-bold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 cursor-pointer"
                       >
                         <option value="1_minggu">1 Minggu</option>
-                        <option value="1_bulan">1 Laporan (1 Bulan)</option>
+                        <option value="1_bulan">1 Bulan</option>
                         <option value="semua">Semua</option>
                       </select>
                     </div>
@@ -2003,7 +2086,7 @@ export default function App() {
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={getChartData(investorCashFlowRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <AreaChart data={getChartData(investorCashFlowRange)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <defs>
                               <linearGradient id="colorPms" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -2013,14 +2096,19 @@ export default function App() {
                                 <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/>
                                 <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
                               </linearGradient>
+                              <linearGradient id="colorKas" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                              </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                             <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                            <YAxis stroke="#64748b" />
-                            <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} />
+                            <YAxis stroke="#64748b" tickFormatter={formatCompact} domain={[(dataMin: number) => (dataMin < 0 ? dataMin * 1.1 : 0), 'auto']} />
+                            <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => formatIDR(Number(value))} />
                             <Legend />
                             <Area type="monotone" dataKey="pemasukan" name="Pemasukan" stroke="#10b981" fillOpacity={1} fill="url(#colorPms)" strokeWidth={2.5} />
                             <Area type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#f43f5e" fillOpacity={1} fill="url(#colorPgl)" strokeWidth={2.5} />
+                            <Area type="monotone" dataKey="kas" name="Kas (Saldo)" stroke="#eab308" fillOpacity={1} fill="url(#colorKas)" strokeWidth={2.5} />
                           </AreaChart>
                         </ResponsiveContainer>
                       )}
@@ -2103,10 +2191,10 @@ export default function App() {
                       </div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={getChartData(investorAcreageRange)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <BarChart data={getChartData(investorAcreageRange)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                           <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                          <YAxis stroke="#64748b" />
+                          <YAxis stroke="#64748b" tickFormatter={formatCompact} />
                           <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => [`${Number(value).toLocaleString("id-ID")} bahu`, "Total Luasan"]} />
                           <Legend />
                           <Bar dataKey="luasan" name="Total Luasan (Bahu)" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
@@ -2161,7 +2249,17 @@ export default function App() {
                         ) : (
                           (() => {
                             const itemsPerPage = 10;
-                            const paginatedPemasukan = pemasukanList.slice((pemasukanPage - 1) * itemsPerPage, pemasukanPage * itemsPerPage);
+                            const sortedPemasukanList = [...pemasukanList].sort((a, b) => {
+                              const aParsed = parsePemasukanItem(a);
+                              const bParsed = parsePemasukanItem(b);
+                              const dateCompare = bParsed.tanggal.localeCompare(aParsed.tanggal);
+                              if (dateCompare !== 0) return dateCompare;
+                              const aTime = aParsed.created_at ? new Date(aParsed.created_at).getTime() : 0;
+                              const bTime = bParsed.created_at ? new Date(bParsed.created_at).getTime() : 0;
+                              if (bTime !== aTime) return bTime - aTime;
+                              return bParsed.id.localeCompare(aParsed.id);
+                            });
+                            const paginatedPemasukan = sortedPemasukanList.slice((pemasukanPage - 1) * itemsPerPage, pemasukanPage * itemsPerPage);
                             return paginatedPemasukan.map((item) => {
                               const parsed = parsePemasukanItem(item);
                               return (
@@ -2254,7 +2352,17 @@ export default function App() {
                         ) : (
                           (() => {
                             const itemsPerPage = 10;
-                            const paginatedPengeluaran = pengeluaranList.slice((pengeluaranPage - 1) * itemsPerPage, pengeluaranPage * itemsPerPage);
+                            const sortedPengeluaranList = [...pengeluaranList].sort((a, b) => {
+                              const aParsed = parsePengeluaranItem(a);
+                              const bParsed = parsePengeluaranItem(b);
+                              const dateCompare = bParsed.tanggal.localeCompare(aParsed.tanggal);
+                              if (dateCompare !== 0) return dateCompare;
+                              const aTime = aParsed.created_at ? new Date(aParsed.created_at).getTime() : 0;
+                              const bTime = bParsed.created_at ? new Date(bParsed.created_at).getTime() : 0;
+                              if (bTime !== aTime) return bTime - aTime;
+                              return bParsed.id.localeCompare(aParsed.id);
+                            });
+                            const paginatedPengeluaran = sortedPengeluaranList.slice((pengeluaranPage - 1) * itemsPerPage, pengeluaranPage * itemsPerPage);
                             return paginatedPengeluaran.map((item) => {
                               const parsed = parsePengeluaranItem(item);
                               return (
@@ -2353,10 +2461,21 @@ export default function App() {
                             </td>
                           </tr>
                         ) : (
-                          mutasiList.map((item) => {
-                            const parsed = parseMutasiItem(item);
-                            return (
-                              <tr key={parsed.id} className="hover:bg-slate-800/20 transition">
+                          (() => {
+                            const sortedMutasiList = [...mutasiList].sort((a, b) => {
+                              const aParsed = parseMutasiItem(a);
+                              const bParsed = parseMutasiItem(b);
+                              const dateCompare = bParsed.tanggal.localeCompare(aParsed.tanggal);
+                              if (dateCompare !== 0) return dateCompare;
+                              const aTime = aParsed.created_at ? new Date(aParsed.created_at).getTime() : 0;
+                              const bTime = bParsed.created_at ? new Date(bParsed.created_at).getTime() : 0;
+                              if (bTime !== aTime) return bTime - aTime;
+                              return bParsed.id.localeCompare(aParsed.id);
+                            });
+                            return sortedMutasiList.map((item) => {
+                              const parsed = parseMutasiItem(item);
+                              return (
+                                <tr key={parsed.id} className="hover:bg-slate-800/20 transition">
                                 <td className="py-3.5 px-5 font-mono font-bold text-indigo-400">{parsed.id}</td>
                                 <td className="py-3.5 px-5 whitespace-nowrap">{parsed.tanggal}</td>
                                 <td className="py-3.5 px-5">
@@ -2394,8 +2513,9 @@ export default function App() {
                                 </td>
                               </tr>
                             );
-                          })
-                        )}
+                          });
+                        })()
+                      )}
                       </tbody>
                     </table>
                   </div>
