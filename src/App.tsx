@@ -1319,7 +1319,10 @@ export default function App() {
                   </div>
                   <div className="space-y-1.5 relative z-10">
                     <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider block">Total Luasan</span>
-                    <h3 className="text-2xl font-black font-mono text-indigo-400 tracking-tight">{totalLuasan.toLocaleString("id-ID")} bahu</h3>
+                    <h3 className="text-2xl font-black font-mono text-indigo-400 tracking-tight">
+                      {totalLuasan.toLocaleString("id-ID")}{" "}
+                      <span className="text-xs font-bold text-slate-400 tracking-normal font-sans ml-1">bahu</span>
+                    </h3>
                     <p className="text-[11px] text-slate-400 font-semibold">Total pengerjaan lahan</p>
                   </div>
                   <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
@@ -2121,7 +2124,10 @@ export default function App() {
                     </div>
                     <div className="space-y-1.5 relative z-10">
                       <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider block">Total Luasan</span>
-                      <h3 className="text-2xl font-black font-mono text-indigo-400 tracking-tight">{totalLuasan.toLocaleString("id-ID")} bahu</h3>
+                      <h3 className="text-2xl font-black font-mono text-indigo-400 tracking-tight">
+                        {totalLuasan.toLocaleString("id-ID")}{" "}
+                        <span className="text-xs font-bold text-slate-400 tracking-normal font-sans ml-1">bahu</span>
+                      </h3>
                       <p className="text-[11px] text-slate-400 font-semibold">Total pengerjaan lahan</p>
                     </div>
                     <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
@@ -2228,7 +2234,7 @@ export default function App() {
                         </div>
                       ) : (
                         <>
-                          <div className="h-44 w-full">
+                          <div className="h-44 mx-auto" style={{ width: '286px' }}>
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie

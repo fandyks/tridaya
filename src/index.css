@@ -6,3 +6,10 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Make all tspan elements in charts have font size 7 */
+svg tspan,
+.recharts-wrapper tspan {
+  font-size: 7px !important;
+}
+
+
