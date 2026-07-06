@@ -2323,7 +2323,8 @@ export default function App() {
                 {/* Table list */}
                 <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[900px]">
+                    {/* TABLE UNTUK PC & TABLET */}
+                    <table className="hidden sm:table w-full text-left border-collapse min-w-[900px]">
                       <thead>
                         <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">
                           <th className="py-4 px-3">ID</th>
@@ -2406,6 +2407,79 @@ export default function App() {
                         )}
                       </tbody>
                     </table>
+
+                    {/* TABLE RINGKAS UNTUK HP (MOBILE VIEW - 3 KOLOM) */}
+                    <table className="table sm:hidden w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">
+                          <th className="py-4 px-4">Item</th>
+                          <th className="py-4 px-4 text-right">Nominal</th>
+                          <th className="py-4 px-4 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
+                        {pemasukanList.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-10 text-center text-slate-500 font-semibold">
+                              Tidak ada catatan pemasukan yang ditemukan.
+                            </td>
+                          </tr>
+                        ) : (
+                          (() => {
+                            const itemsPerPage = 10;
+                            const sortedPemasukanList = [...pemasukanList].sort((a, b) => {
+                              const aParsed = parsePemasukanItem(a);
+                              const bParsed = parsePemasukanItem(b);
+                              const dateCompare = bParsed.tanggal.localeCompare(aParsed.tanggal);
+                              if (dateCompare !== 0) return dateCompare;
+                              const aTime = aParsed.created_at ? new Date(aParsed.created_at).getTime() : 0;
+                              const bTime = bParsed.created_at ? new Date(bParsed.created_at).getTime() : 0;
+                              if (bTime !== aTime) return bTime - aTime;
+                              return bParsed.id.localeCompare(aParsed.id);
+                            });
+                            const paginatedPemasukan = sortedPemasukanList.slice((pemasukanPage - 1) * itemsPerPage, pemasukanPage * itemsPerPage);
+                            return paginatedPemasukan.map((item) => {
+                              const parsed = parsePemasukanItem(item);
+                              return (
+                                <tr key={`${parsed.id}-mob`} className="hover:bg-slate-800/10 transition">
+                                  <td className="py-3 px-4 space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-mono text-[9px] font-bold text-indigo-400">{parsed.id}</span>
+                                      <span className="text-[9px] text-slate-500 font-semibold">{parsed.tanggal}</span>
+                                    </div>
+                                    <p className="font-bold text-slate-200 text-xs truncate max-w-[140px]" title={parsed.keterangan}>
+                                      {parsed.keterangan || "Pendapatan Lahan"}
+                                    </p>
+                                    <p className="text-[10px] text-indigo-300 font-semibold leading-none">{parsed.luasan.toLocaleString("id-ID")} bahu</p>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-black text-emerald-400 align-middle">
+                                    {formatIDR(parsed.pendapatan_bersih)}
+                                  </td>
+                                  <td className="py-3 px-4 text-center align-middle">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        onClick={() => handleOpenEdit("pemasukan", parsed)}
+                                        className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete("pemasukan", parsed.id)}
+                                        className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
+                                        title="Hapus"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                   {renderPagination(pemasukanPage, pemasukanList.length, 10, setPemasukanPage)}
                 </div>
@@ -2429,7 +2503,8 @@ export default function App() {
                 {/* Table list */}
                 <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
+                    {/* TABLE UNTUK PC & TABLET */}
+                    <table className="hidden sm:table w-full text-left border-collapse min-w-[700px]">
                       <thead>
                         <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">
                           <th className="py-4 px-5">ID</th>
@@ -2518,6 +2593,81 @@ export default function App() {
                         )}
                       </tbody>
                     </table>
+
+                    {/* TABLE RINGKAS UNTUK HP (MOBILE VIEW - 3 KOLOM) */}
+                    <table className="table sm:hidden w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">
+                          <th className="py-4 px-4">Item</th>
+                          <th className="py-4 px-4 text-right">Nominal</th>
+                          <th className="py-4 px-4 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
+                        {pengeluaranList.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-10 text-center text-slate-500 font-semibold">
+                              Tidak ada catatan pengeluaran yang ditemukan.
+                            </td>
+                          </tr>
+                        ) : (
+                          (() => {
+                            const itemsPerPage = 10;
+                            const sortedPengeluaranList = [...pengeluaranList].sort((a, b) => {
+                              const aParsed = parsePengeluaranItem(a);
+                              const bParsed = parsePengeluaranItem(b);
+                              const dateCompare = bParsed.tanggal.localeCompare(aParsed.tanggal);
+                              if (dateCompare !== 0) return dateCompare;
+                              const aTime = aParsed.created_at ? new Date(aParsed.created_at).getTime() : 0;
+                              const bTime = bParsed.created_at ? new Date(bParsed.created_at).getTime() : 0;
+                              if (bTime !== aTime) return bTime - aTime;
+                              return bParsed.id.localeCompare(aParsed.id);
+                            });
+                            const paginatedPengeluaran = sortedPengeluaranList.slice((pengeluaranPage - 1) * itemsPerPage, pengeluaranPage * itemsPerPage);
+                            return paginatedPengeluaran.map((item) => {
+                              const parsed = parsePengeluaranItem(item);
+                              return (
+                                <tr key={`${parsed.id}-mob`} className="hover:bg-slate-800/10 transition">
+                                  <td className="py-3 px-4 space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-mono text-[9px] font-bold text-indigo-400">{parsed.id}</span>
+                                      <span className="text-[9px] text-slate-500 font-semibold">{parsed.tanggal}</span>
+                                    </div>
+                                    <p className="font-bold text-slate-200 text-xs truncate max-w-[140px]" title={parsed.keterangan}>
+                                      {parsed.keterangan || parsed.kategori}
+                                    </p>
+                                    <span className={`inline-block px-2 py-0.5 text-[8px] font-black uppercase rounded ${getCategoryBadgeClass(parsed.kategori)}`}>
+                                      {parsed.kategori}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-black text-rose-400 align-middle">
+                                    {formatIDR(parsed.nominal)}
+                                  </td>
+                                  <td className="py-3 px-4 text-center align-middle">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        onClick={() => handleOpenEdit("pengeluaran", parsed)}
+                                        className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete("pengeluaran", parsed.id)}
+                                        className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
+                                        title="Hapus"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                   {renderPagination(pengeluaranPage, pengeluaranList.length, 10, setPengeluaranPage)}
                 </div>
@@ -2541,7 +2691,7 @@ export default function App() {
                 {/* Table list */}
                 <div className="bg-slate-900/60 rounded-2xl border border-slate-800/80 shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="hidden sm:table w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">
                           <th className="py-4 px-5">ID</th>
@@ -2616,6 +2766,79 @@ export default function App() {
                           });
                         })()
                       )}
+                      </tbody>
+                    </table>
+
+                    {/* TABLE RINGKAS UNTUK HP (MOBILE VIEW - 3 KOLOM) */}
+                    <table className="table sm:hidden w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/80 border-b border-slate-800 text-[10px] text-slate-400 uppercase tracking-wider font-extrabold">
+                          <th className="py-4 px-4">Item</th>
+                          <th className="py-4 px-4 text-right">Nominal</th>
+                          <th className="py-4 px-4 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-xs text-slate-300">
+                        {mutasiList.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-10 text-center text-slate-500 font-semibold">
+                              Tidak ada catatan mutasi kas yang ditemukan.
+                            </td>
+                          </tr>
+                        ) : (
+                          (() => {
+                            const sortedMutasiList = [...mutasiList].sort((a, b) => {
+                              const aParsed = parseMutasiItem(a);
+                              const bParsed = parseMutasiItem(b);
+                              const dateCompare = bParsed.tanggal.localeCompare(aParsed.tanggal);
+                              if (dateCompare !== 0) return dateCompare;
+                              const aTime = aParsed.created_at ? new Date(aParsed.created_at).getTime() : 0;
+                              const bTime = bParsed.created_at ? new Date(bParsed.created_at).getTime() : 0;
+                              if (bTime !== aTime) return bTime - aTime;
+                              return bParsed.id.localeCompare(aParsed.id);
+                            });
+                            return sortedMutasiList.map((item) => {
+                              const parsed = parseMutasiItem(item);
+                              return (
+                                <tr key={`${parsed.id}-mob`} className="hover:bg-slate-800/10 transition">
+                                  <td className="py-3 px-4 space-y-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-mono text-[9px] font-bold text-indigo-400">{parsed.id}</span>
+                                      <span className="text-[9px] text-slate-500 font-semibold">{parsed.tanggal}</span>
+                                    </div>
+                                    <p className="font-bold text-slate-200 text-xs truncate max-w-[140px]" title={parsed.keterangan}>
+                                      {parsed.keterangan || parsed.jenis}
+                                    </p>
+                                    <span className={`inline-block px-2 py-0.5 text-[8px] font-black uppercase rounded ${parsed.jenis === "Deposit" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border border-rose-500/20"}`}>
+                                      {parsed.jenis}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono font-black text-blue-400 align-middle">
+                                    {formatIDR(parsed.nominal)}
+                                  </td>
+                                  <td className="py-3 px-4 text-center align-middle">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        onClick={() => handleOpenEdit("mutasi", parsed)}
+                                        className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete("mutasi", parsed.id)}
+                                        className="p-1.5 hover:bg-rose-950 rounded-lg text-slate-400 hover:text-rose-400 transition"
+                                        title="Hapus"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })()
+                        )}
                       </tbody>
                     </table>
                   </div>
