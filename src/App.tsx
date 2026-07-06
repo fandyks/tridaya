@@ -1555,7 +1555,6 @@ export default function App() {
                           <thead>
                             <tr className="border-b border-slate-800 bg-slate-900/40 text-[10px] font-black uppercase tracking-widest text-slate-400">
                               <th className="p-4">Tanggal</th>
-                              <th className="p-4">ID Transaksi</th>
                               <th className="p-4">Jenis</th>
                               <th className="p-4">Keterangan / Detil</th>
                               <th className="p-4 text-right">Nominal (IDR)</th>
@@ -1564,7 +1563,7 @@ export default function App() {
                           <tbody className="divide-y divide-slate-800/60 font-semibold text-xs text-slate-300">
                             {paginatedInvestorTx.length === 0 ? (
                               <tr>
-                                <td colSpan={5} className="py-10 text-center text-slate-500 font-semibold">
+                                <td colSpan={4} className="py-10 text-center text-slate-500 font-semibold">
                                   Tidak ada transaksi yang ditemukan.
                                 </td>
                               </tr>
@@ -1572,7 +1571,6 @@ export default function App() {
                               paginatedInvestorTx.map((tx, idx) => (
                                 <tr key={`${tx.id}-${idx}`} className="hover:bg-slate-900/30 transition">
                                   <td className="p-4 font-mono text-[11px] text-indigo-400 whitespace-nowrap">{tx.tanggal}</td>
-                                  <td className="p-4 font-mono text-[10px] text-slate-400">{tx.id}</td>
                                   <td className="p-4">
                                     <span
                                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${
