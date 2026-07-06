@@ -197,10 +197,31 @@ export default function App() {
   const [formGajiHelper, setFormGajiHelper] = useState<number>(0);
   const [formLainnya, setFormLainnya] = useState<number>(0);
 
-  // Robust helper to normalize any date string into standard YYYY-MM-DD
+  // UTC+7 (Asia/Jakarta) Timezone Helper functions
+  const getTodayUTC7String = (): string => {
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    return formatter.format(new Date());
+  };
+
+  const formatInUTC7 = (date: Date): string => {
+    const formatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    return formatter.format(date);
+  };
+
+  // Robust helper to normalize any date string into standard YYYY-MM-DD (WIB/UTC+7)
   const normalizeDate = (rawVal: any): string => {
     if (rawVal === undefined || rawVal === null) {
-      return new Date().toISOString().split("T")[0];
+      return getTodayUTC7String();
     }
     
     let dateStr = "";
@@ -218,19 +239,29 @@ export default function App() {
 
     const trimmed = dateStr.trim();
     if (!trimmed || trimmed === "[object Object]") {
-      return new Date().toISOString().split("T")[0];
+      return getTodayUTC7String();
     }
 
+    // 1. If it's already a clean YYYY-MM-DD date-only string, return it immediately to avoid any timezone shifts
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
       return trimmed;
     }
-    const firstPart = trimmed.split(/[T ]/)[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(firstPart)) {
-      return firstPart;
+
+    // 2. If it is an ISO string or contains "T" (like "2026-07-05T17:00:00.000Z"), parse as Date and get UTC+7 local date
+    if (trimmed.includes("T")) {
+      try {
+        const d = new Date(trimmed);
+        if (!isNaN(d.getTime())) {
+          return formatInUTC7(d);
+        }
+      } catch (e) {}
     }
-    const separator = trimmed.includes("/") ? "/" : trimmed.includes("-") ? "-" : "";
+
+    // 3. Handle other formats (like DD/MM/YYYY, MM/DD/YYYY, or DD-MM-YYYY)
+    const dateOnly = trimmed.split(/[T ]/)[0].trim();
+    const separator = dateOnly.includes("/") ? "/" : dateOnly.includes("-") ? "-" : "";
     if (separator) {
-      const parts = trimmed.split(separator);
+      const parts = dateOnly.split(separator).map(p => p.trim());
       if (parts.length === 3) {
         if (parts[0].length === 4) {
           const year = parts[0];
@@ -238,30 +269,48 @@ export default function App() {
           const day = parts[2].padStart(2, '0');
           return `${year}-${month}-${day}`;
         }
-        if (parts[2].length === 4) {
-          const day = parts[0].padStart(2, '0');
-          const month = parts[1].padStart(2, '0');
-          const year = parts[2];
-          return `${year}-${month}-${day}`;
+        
+        let year = parts[2];
+        if (year.length === 2) {
+          year = "20" + year;
         }
-        if (parts[2].length === 2) {
-          const day = parts[0].padStart(2, '0');
-          const month = parts[1].padStart(2, '0');
-          const year = "20" + parts[2];
-          return `${year}-${month}-${day}`;
+        
+        if (year.length === 4) {
+          const p0 = parseInt(parts[0], 10);
+          const p1 = parseInt(parts[1], 10);
+          let monthVal = p0;
+          let dayVal = p1;
+          
+          if (p0 > 12) {
+            // e.g. 25/12/2026 -> DD/MM/YYYY
+            monthVal = p1;
+            dayVal = p0;
+          } else if (p1 > 12) {
+            // e.g. 12/25/2026 -> MM/DD/YYYY
+            monthVal = p0;
+            dayVal = p1;
+          } else {
+            // e.g. 7/2/2026 -> Default to MM/DD/YYYY because user's Google Sheets outputs July 2nd as 7/2/2026
+            monthVal = p0;
+            dayVal = p1;
+          }
+          
+          const monthStr = String(monthVal).padStart(2, '0');
+          const dayStr = String(dayVal).padStart(2, '0');
+          return `${year}-${monthStr}-${dayStr}`;
         }
       }
     }
+
+    // Fallback: standard Date parsing in UTC+7 timezone
     try {
       const d = new Date(trimmed);
       if (!isNaN(d.getTime())) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return formatInUTC7(d);
       }
     } catch (e) {}
-    return new Date().toISOString().split("T")[0];
+
+    return getTodayUTC7String();
   };
 
   // Helper to parse any object safely as a Pemasukan structure
@@ -725,7 +774,7 @@ export default function App() {
 
   // Reset Form state
   const resetForm = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayUTC7String();
     setFormTanggal(today);
     setFormKategori(categoriesList.filter(c => c.tipe === modalType)[0]?.nama || "Lainnya");
     setFormKeterangan("");
@@ -777,7 +826,7 @@ export default function App() {
     setIsModalOpen(true);
     // Needs delay so states match correctly before reset
     setTimeout(() => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = getTodayUTC7String();
       setFormTanggal(today);
       setFormKategori(categoriesList.filter(c => c.tipe === type)[0]?.nama || "Lainnya");
       setFormKeterangan("");
@@ -1221,7 +1270,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-2 bg-slate-900/40 border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400">
                 <Clock className="h-4 w-4 text-indigo-400" />
-                <span className="font-mono">Live: {new Date().toISOString().split("T")[0]}</span>
+                <span className="font-mono">Live UTC+7: {getTodayUTC7String()}</span>
               </div>
             </div>
           </div>
@@ -1970,7 +2019,7 @@ export default function App() {
 
           <div className="flex items-center gap-3 bg-slate-900 border border-slate-800/80 px-4 py-2 rounded-xl text-xs font-semibold text-slate-400">
             <Clock className="h-4 w-4 text-indigo-400" />
-            <span className="font-mono">Live UTC: {new Date().toISOString().split("T")[0]}</span>
+            <span className="font-mono">Live UTC+7: {getTodayUTC7String()}</span>
           </div>
         </div>
 

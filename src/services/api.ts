@@ -37,6 +37,45 @@ async function postRequest(action: string, payload: any = {}) {
   return response.json();
 }
 
+const formatToSheetDate = (dateVal: any): string => {
+  if (!dateVal) return "";
+  const dateStr = String(dateVal).trim();
+  
+  // Parse YYYY-MM-DD
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const day = parseInt(match[3], 10);
+    return `${month}/${day}/${year} 07:00:00`;
+  }
+  
+  // Fallback using Date parser formatted in Asia/Jakarta timezone
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "numeric",
+        day: "numeric"
+      });
+      return `${formatter.format(d)} 07:00:00`;
+    }
+  } catch (e) {}
+
+  return dateStr;
+};
+
+const formatPayloadDates = <T extends { tanggal?: string }>(data: T): T => {
+  if (!data) return data;
+  const formatted = { ...data };
+  if (formatted.tanggal) {
+    formatted.tanggal = formatToSheetDate(formatted.tanggal);
+  }
+  return formatted;
+};
+
 export const apiService = {
   // GET Requests
   getDashboard: async () => {
@@ -85,11 +124,11 @@ export const apiService = {
   },
 
   createPemasukan: async (data: Partial<Pemasukan>) => {
-    return postRequest("createPemasukan", { data });
+    return postRequest("createPemasukan", { data: formatPayloadDates(data) });
   },
 
   updatePemasukan: async (id: string, data: Partial<Pemasukan>) => {
-    return postRequest("updatePemasukan", { id, data });
+    return postRequest("updatePemasukan", { id, data: formatPayloadDates(data) });
   },
 
   deletePemasukan: async (id: string) => {
@@ -97,11 +136,11 @@ export const apiService = {
   },
 
   createPengeluaran: async (data: Partial<Transaction>) => {
-    return postRequest("createPengeluaran", { data });
+    return postRequest("createPengeluaran", { data: formatPayloadDates(data) });
   },
 
   updatePengeluaran: async (id: string, data: Partial<Transaction>) => {
-    return postRequest("updatePengeluaran", { id, data });
+    return postRequest("updatePengeluaran", { id, data: formatPayloadDates(data) });
   },
 
   deletePengeluaran: async (id: string) => {
@@ -109,11 +148,11 @@ export const apiService = {
   },
 
   createMutasiKas: async (data: Partial<CashTransfer>) => {
-    return postRequest("createMutasiKas", { data });
+    return postRequest("createMutasiKas", { data: formatPayloadDates(data) });
   },
 
   updateMutasiKas: async (id: string, data: Partial<CashTransfer>) => {
-    return postRequest("updateMutasiKas", { id, data });
+    return postRequest("updateMutasiKas", { id, data: formatPayloadDates(data) });
   },
 
   deleteMutasiKas: async (id: string) => {
