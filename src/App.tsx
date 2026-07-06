@@ -1263,7 +1263,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="hidden sm:flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="flex items-center gap-2.5 bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-md shadow-emerald-500/50" />
                 <span>Koneksi Aman Terverifikasi</span>
@@ -1365,7 +1365,7 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Tren Aliran Kas Harian</h4>
-                      <p className="text-[11px] text-slate-500">Visualisasi pemasukan and pengeluaran harian</p>
+                      <p className="hidden sm:block text-[11px] text-slate-500">Visualisasi pemasukan and pengeluaran harian</p>
                     </div>
                     <select
                       value={dashboardCashFlowRange}
@@ -1400,10 +1400,10 @@ export default function App() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                          <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                          <YAxis stroke="#64748b" tickFormatter={formatCompact} domain={[(dataMin: number) => (dataMin < 0 ? dataMin * 1.1 : 0), 'auto']} />
+                          <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} tick={{ fontSize: 9 }} />
+                          <YAxis stroke="#64748b" tickFormatter={formatCompact} domain={[(dataMin: number) => (dataMin < 0 ? dataMin * 1.1 : 0), 'auto']} tick={{ fontSize: 9, dx: -2 }} width={35} />
                           <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => formatIDR(Number(value))} />
-                          <Legend />
+                          <Legend wrapperStyle={{ fontSize: '9px' }} />
                           <Area type="monotone" dataKey="pemasukan" name="Pemasukan" stroke="#10b981" fillOpacity={1} fill="url(#colorPms)" strokeWidth={2.5} />
                           <Area type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#f43f5e" fillOpacity={1} fill="url(#colorPgl)" strokeWidth={2.5} />
                           <Area type="monotone" dataKey="kas" name="Kas (Saldo)" stroke="#eab308" fillOpacity={1} fill="url(#colorKas)" strokeWidth={2.5} />
@@ -1417,7 +1417,7 @@ export default function App() {
                 <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
                   <div>
                     <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Breakdown Pengeluaran</h4>
-                    <p className="text-[11px] text-slate-500">Berdasarkan klasifikasi kategori</p>
+                    <p className="hidden sm:block text-[11px] text-slate-500">Berdasarkan klasifikasi kategori</p>
                   </div>
                   <div className="h-72 w-full flex flex-col justify-between">
                     {currentCategoryBreakdown.length === 0 ? (
@@ -1470,7 +1470,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
-                    <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                    <p className="hidden sm:block text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
                   </div>
                   <select
                     value={dashboardAcreageRange}
@@ -1491,10 +1491,10 @@ export default function App() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={getChartData(dashboardAcreageRange)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                        <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                        <YAxis stroke="#64748b" tickFormatter={formatCompact} />
+                        <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} tick={{ fontSize: 9 }} />
+                        <YAxis stroke="#64748b" tickFormatter={formatCompact} tick={{ fontSize: 9, dx: -2 }} width={35} />
                         <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => [`${Number(value).toLocaleString("id-ID")} bahu`, "Total Luasan"]} />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: '9px' }} />
                         <Bar dataKey="luasan" name="Total Luasan (Bahu)" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1545,7 +1545,7 @@ export default function App() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
                         <h4 className="text-sm font-black uppercase text-slate-300 tracking-wider">Rincian Riwayat Transaksi</h4>
-                        <p className="text-xs text-slate-500 mt-0.5">Semua catatan pemasukan, pengeluaran, dan mutasi terurut berdasarkan tanggal.</p>
+                        <p className="hidden sm:block text-xs text-slate-500 mt-0.5">Semua catatan pemasukan, pengeluaran, dan mutasi terurut berdasarkan tanggal.</p>
                       </div>
                     </div>
 
@@ -2167,7 +2167,7 @@ export default function App() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Tren Aliran Kas Harian</h4>
-                        <p className="text-[11px] text-slate-500">Visualisasi pemasukan dan pengeluaran harian</p>
+                        <p className="hidden sm:block text-[11px] text-slate-500">Visualisasi pemasukan dan pengeluaran harian</p>
                       </div>
                       <select
                         value={investorCashFlowRange}
@@ -2202,10 +2202,10 @@ export default function App() {
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                            <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                            <YAxis stroke="#64748b" tickFormatter={formatCompact} domain={[(dataMin: number) => (dataMin < 0 ? dataMin * 1.1 : 0), 'auto']} />
+                            <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} tick={{ fontSize: 9 }} />
+                            <YAxis stroke="#64748b" tickFormatter={formatCompact} domain={[(dataMin: number) => (dataMin < 0 ? dataMin * 1.1 : 0), 'auto']} tick={{ fontSize: 9, dx: -2 }} width={35} />
                             <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => formatIDR(Number(value))} />
-                            <Legend />
+                            <Legend wrapperStyle={{ fontSize: '9px' }} />
                             <Area type="monotone" dataKey="pemasukan" name="Pemasukan" stroke="#10b981" fillOpacity={1} fill="url(#colorPms)" strokeWidth={2.5} />
                             <Area type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#f43f5e" fillOpacity={1} fill="url(#colorPgl)" strokeWidth={2.5} />
                             <Area type="monotone" dataKey="kas" name="Kas (Saldo)" stroke="#eab308" fillOpacity={1} fill="url(#colorKas)" strokeWidth={2.5} />
@@ -2219,7 +2219,7 @@ export default function App() {
                   <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80 space-y-4">
                     <div>
                       <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Breakdown Pengeluaran</h4>
-                      <p className="text-[11px] text-slate-500">Berdasarkan klasifikasi kategori</p>
+                      <p className="hidden sm:block text-[11px] text-slate-500">Berdasarkan klasifikasi kategori</p>
                     </div>
                     <div className="h-72 w-full flex flex-col justify-between">
                       {currentCategoryBreakdown.length === 0 ? (
@@ -2272,7 +2272,7 @@ export default function App() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-black uppercase text-indigo-400 tracking-wider">Tren Luasan Harian</h4>
-                      <p className="text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
+                      <p className="hidden sm:block text-[11px] text-slate-500">Visualisasi total luasan lahan yang dikerjakan per hari (bahu)</p>
                     </div>
                     <select
                       value={investorAcreageRange}
@@ -2293,10 +2293,10 @@ export default function App() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={getChartData(investorAcreageRange)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                          <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-                          <YAxis stroke="#64748b" tickFormatter={formatCompact} />
+                          <XAxis dataKey="tanggal" stroke="#64748b" tickFormatter={(v) => v.split("-").slice(1).join("/")} tick={{ fontSize: 9 }} />
+                          <YAxis stroke="#64748b" tickFormatter={formatCompact} tick={{ fontSize: 9, dx: -2 }} width={35} />
                           <Tooltip contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155" }} formatter={(value) => [`${Number(value).toLocaleString("id-ID")} bahu`, "Total Luasan"]} />
-                          <Legend />
+                          <Legend wrapperStyle={{ fontSize: '9px' }} />
                           <Bar dataKey="luasan" name="Total Luasan (Bahu)" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={50} />
                         </BarChart>
                       </ResponsiveContainer>
