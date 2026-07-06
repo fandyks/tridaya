@@ -1258,8 +1258,8 @@ export default function App() {
               </div>
               <div>
                 <span className="text-[10px] text-indigo-400 uppercase tracking-widest font-black block">Portal Investor Tridaya</span>
-                <h1 className="text-2xl font-black tracking-tight text-white mt-0.5">Dasbor Laporan Keuangan</h1>
-                <p className="text-xs text-slate-500 mt-0.5 font-semibold">Realtime Accounting Report</p>
+                <h1 className="text-2xl font-black tracking-tight text-white mt-0.5">Laporan Keuangan</h1>
+                <p className="text-xs text-slate-500 mt-0.5 font-semibold">Combine Harvester CROWN CCH106</p>
               </div>
             </div>
 
