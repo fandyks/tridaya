@@ -535,66 +535,57 @@ export default function App() {
 
     let hasErrors = false;
 
-    // 1. Fetch dashboard status
     try {
-      const data = await apiService.getDashboard();
-      if (data.status === "success") {
-        addLog("Koneksi dasbor Google Sheets berhasil.", "success");
-      } else {
-        addLog(`Informasi dasbor: ${data.message || "Buku kas kosong"}`, "info");
-      }
-    } catch (err: any) {
-      addLog(`Dasbor API luring: ${err.message}`, "error");
-      showSnackbar(`Gagal memuat status dasbor: ${err.message}`, "error");
-      hasErrors = true;
-    }
+      // Fetch Pemasukan, Pengeluaran, and MutasiKas in parallel
+      const [pemasukanRes, pengeluaranRes, mutasiRes] = await Promise.allSettled([
+        apiService.getPemasukan(),
+        apiService.getPengeluaran(),
+        apiService.getMutasiKas()
+      ]);
 
-    // 2. Fetch Pemasukan sheet
-    try {
-      const data = await apiService.getPemasukan();
-      if (Array.isArray(data)) {
-        const parsedList = data.map((item: any) => parsePemasukanItem(item));
+      // 1. Process Pemasukan
+      if (pemasukanRes.status === "fulfilled" && Array.isArray(pemasukanRes.value)) {
+        const parsedList = pemasukanRes.value.map((item: any) => parsePemasukanItem(item));
         setPemasukanList(parsedList);
-        addLog(`Berhasil memuat ${data.length} baris data Pemasukan.`, "success");
+        addLog(`Berhasil memuat ${pemasukanRes.value.length} baris data Pemasukan.`, "success");
       } else {
         setPemasukanList([]);
+        const errMsg = pemasukanRes.status === "rejected" ? pemasukanRes.reason.message : "Data tidak valid";
+        addLog(`API Pemasukan offline: ${errMsg}. Data dikosongkan.`, "error");
+        showSnackbar(`Pemasukan: ${errMsg}`, "error");
+        hasErrors = true;
       }
-    } catch (err: any) {
-      setPemasukanList([]);
-      addLog(`API Pemasukan offline: ${err.message}. Data dikosongkan.`, "error");
-      showSnackbar(`Pemasukan: ${err.message}`, "error");
-    }
 
-    // 3. Fetch Pengeluaran sheet
-    try {
-      const data = await apiService.getPengeluaran();
-      if (Array.isArray(data)) {
-        const parsedList = data.map((item: any) => parsePengeluaranItem(item));
+      // 2. Process Pengeluaran
+      if (pengeluaranRes.status === "fulfilled" && Array.isArray(pengeluaranRes.value)) {
+        const parsedList = pengeluaranRes.value.map((item: any) => parsePengeluaranItem(item));
         setPengeluaranList(parsedList);
-        addLog(`Berhasil memuat ${data.length} baris data Pengeluaran.`, "success");
+        addLog(`Berhasil memuat ${pengeluaranRes.value.length} baris data Pengeluaran.`, "success");
       } else {
         setPengeluaranList([]);
+        const errMsg = pengeluaranRes.status === "rejected" ? pengeluaranRes.reason.message : "Data tidak valid";
+        addLog(`API Pengeluaran offline: ${errMsg}. Data dikosongkan.`, "error");
+        showSnackbar(`Pengeluaran: ${errMsg}`, "error");
+        hasErrors = true;
       }
-    } catch (err: any) {
-      setPengeluaranList([]);
-      addLog(`API Pengeluaran offline: ${err.message}. Data dikosongkan.`, "error");
-      showSnackbar(`Pengeluaran: ${err.message}`, "error");
-    }
 
-    // 4. Fetch MutasiKas sheet
-    try {
-      const data = await apiService.getMutasiKas();
-      if (Array.isArray(data)) {
-        const parsedList = data.map((item: any) => parseMutasiItem(item));
+      // 3. Process MutasiKas
+      if (mutasiRes.status === "fulfilled" && Array.isArray(mutasiRes.value)) {
+        const parsedList = mutasiRes.value.map((item: any) => parseMutasiItem(item));
         setMutasiList(parsedList);
-        addLog(`Berhasil memuat ${data.length} baris data MutasiKas.`, "success");
+        addLog(`Berhasil memuat ${mutasiRes.value.length} baris data MutasiKas.`, "success");
       } else {
         setMutasiList([]);
+        const errMsg = mutasiRes.status === "rejected" ? mutasiRes.reason.message : "Data tidak valid";
+        addLog(`API MutasiKas offline: ${errMsg}. Data dikosongkan.`, "error");
+        showSnackbar(`Mutasi Kas: ${errMsg}`, "error");
+        hasErrors = true;
       }
+
     } catch (err: any) {
-      setMutasiList([]);
-      addLog(`API MutasiKas offline: ${err.message}. Data dikosongkan.`, "error");
-      showSnackbar(`Mutasi Kas: ${err.message}`, "error");
+      addLog(`Sinkronisasi API gagal: ${err.message}`, "error");
+      showSnackbar(`Sinkronisasi Gagal: ${err.message}`, "error");
+      hasErrors = true;
     }
 
     if (hasErrors) {
