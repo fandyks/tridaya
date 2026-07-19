@@ -1296,7 +1296,7 @@ export default function App() {
                   <div className="space-y-1.5 relative z-10">
                     <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wider block">Total Saldo</span>
                     <h3 className={`text-2xl font-black font-mono tracking-tight ${totalSaldo >= 0 ? "text-slate-100" : "text-rose-500"}`}>{formatIDR(totalSaldo)}</h3>
-                    <p className="text-[9px] text-slate-400 font-semibold leading-tight">Kas ({formatIDR(totalKas)}) + Pendapatan Bersih ({formatIDR(totalPemasukan)}) - Pengeluaran ({formatIDR(totalPengeluaran)})</p>
+                    <p className="text-[9px] text-slate-400 font-semibold leading-tight">Pendapatan Bersih</p>
                   </div>
                   <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
                     <Wallet className="h-5.5 w-5.5" />
@@ -2101,7 +2101,7 @@ export default function App() {
                     <div className="space-y-1.5 relative z-10">
                       <span className="text-[10px] text-indigo-400 font-extrabold uppercase tracking-wider block">Total Saldo</span>
                       <h3 className={`text-2xl font-black font-mono tracking-tight ${totalSaldo >= 0 ? "text-slate-100" : "text-rose-500"}`}>{formatIDR(totalSaldo)}</h3>
-                      <p className="text-[9px] text-slate-400 font-semibold leading-tight">Kas ({formatIDR(totalKas)}) + Pendapatan Bersih ({formatIDR(totalPemasukan)}) - Pengeluaran ({formatIDR(totalPengeluaran)})</p>
+                      <p className="text-[9px] text-slate-400 font-semibold leading-tight">Pendapatan Bersih</p>
                     </div>
                     <div className="p-3.5 bg-indigo-500/10 text-indigo-400 rounded-xl border border-indigo-500/20 relative z-10">
                       <Wallet className="h-5.5 w-5.5" />
