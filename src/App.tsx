@@ -191,11 +191,11 @@ export default function App() {
   const [formPic, setFormPic] = useState<string>("");
 
   // Form states specifically for Pemasukan
-  const [formLuasan, setFormLuasan] = useState<number>(0);
-  const [formPendapatanKotor, setFormPendapatanKotor] = useState<number>(0);
-  const [formGajiOperator, setFormGajiOperator] = useState<number>(0);
-  const [formGajiHelper, setFormGajiHelper] = useState<number>(0);
-  const [formLainnya, setFormLainnya] = useState<number>(0);
+  const [formLuasan, setFormLuasan] = useState<string>("");
+  const [formPendapatanKotor, setFormPendapatanKotor] = useState<string>("");
+  const [formGajiOperator, setFormGajiOperator] = useState<string>("");
+  const [formGajiHelper, setFormGajiHelper] = useState<string>("");
+  const [formLainnya, setFormLainnya] = useState<string>("");
 
   // UTC+7 (Asia/Jakarta) Timezone Helper functions
   const getTodayUTC7String = (): string => {
@@ -782,11 +782,11 @@ export default function App() {
     setFormDari("Kas Tunai");
     setFormKe("Bank Mandiri");
     setFormJenis("Deposit");
-    setFormLuasan(0);
-    setFormPendapatanKotor(0);
-    setFormGajiOperator(0);
-    setFormGajiHelper(0);
-    setFormLainnya(0);
+    setFormLuasan("");
+    setFormPendapatanKotor("");
+    setFormGajiOperator("");
+    setFormGajiHelper("");
+    setFormLainnya("");
     setEditingItem(null);
     setModalError(null);
   };
@@ -800,11 +800,11 @@ export default function App() {
     setModalError(null);
     if (type === "pemasukan") {
       const parsedItem = parsePemasukanItem(item);
-      setFormLuasan(parsedItem.luasan);
-      setFormPendapatanKotor(parsedItem.pendapatan_kotor);
-      setFormGajiOperator(parsedItem.gaji_operator);
-      setFormGajiHelper(parsedItem.gaji_helper);
-      setFormLainnya(parsedItem.lainnya);
+      setFormLuasan(String(parsedItem.luasan));
+      setFormPendapatanKotor(String(parsedItem.pendapatan_kotor));
+      setFormGajiOperator(String(parsedItem.gaji_operator));
+      setFormGajiHelper(String(parsedItem.gaji_helper));
+      setFormLainnya(String(parsedItem.lainnya));
       setFormJumlah(parsedItem.pendapatan_bersih);
     } else if (type === "mutasi") {
       const parsedItem = parseMutasiItem(item);
@@ -835,11 +835,11 @@ export default function App() {
       setFormKe("Bank Mandiri");
       setFormJenis("Deposit");
       setFormPic("");
-      setFormLuasan(0);
-      setFormPendapatanKotor(0);
-      setFormGajiOperator(0);
-      setFormGajiHelper(0);
-      setFormLainnya(0);
+      setFormLuasan("");
+      setFormPendapatanKotor("");
+      setFormGajiOperator("");
+      setFormGajiHelper("");
+      setFormLainnya("");
       setEditingItem(null);
     }, 10);
   };
@@ -849,7 +849,7 @@ export default function App() {
     e.preventDefault();
     
     if (modalType === "pemasukan") {
-      if (formPendapatanKotor <= 0) {
+      if (Number(formPendapatanKotor) <= 0) {
         setModalError("Pendapatan kotor harus lebih dari 0.");
         return;
       }
@@ -862,15 +862,15 @@ export default function App() {
     setModalError(null);
 
     if (modalType === "pemasukan") {
-      const net = formPendapatanKotor - (formGajiOperator + formGajiHelper + formLainnya);
+      const net = Number(formPendapatanKotor) - (Number(formGajiOperator) + Number(formGajiHelper) + Number(formLainnya));
       const payloadData: Pemasukan = {
         id: editingItem ? editingItem.id : `TX-${Math.floor(1000 + Math.random() * 9000)}`,
         tanggal: formTanggal,
-        luasan: formLuasan,
-        pendapatan_kotor: formPendapatanKotor,
-        gaji_operator: formGajiOperator,
-        gaji_helper: formGajiHelper,
-        lainnya: formLainnya,
+        luasan: Number(formLuasan) || 0,
+        pendapatan_kotor: Number(formPendapatanKotor) || 0,
+        gaji_operator: Number(formGajiOperator) || 0,
+        gaji_helper: Number(formGajiHelper) || 0,
+        lainnya: Number(formLainnya) || 0,
         pendapatan_bersih: net,
         keterangan: formKeterangan,
         nominal: net,
@@ -3049,11 +3049,15 @@ export default function App() {
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Luasan (Bahu)</label>
                         <input
-                          type="number"
+                          type="text"
                           required
-                          min={0}
-                          value={formLuasan === 0 ? "" : formLuasan}
-                          onChange={(e) => setFormLuasan(Number(e.target.value))}
+                          value={formLuasan}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                              setFormLuasan(val);
+                            }
+                          }}
                           placeholder="0"
                           className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-200 transition font-mono font-bold"
                         />
@@ -3061,11 +3065,15 @@ export default function App() {
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Pend. Kotor (Rp)</label>
                         <input
-                          type="number"
+                          type="text"
                           required
-                          min={0}
-                          value={formPendapatanKotor === 0 ? "" : formPendapatanKotor}
-                          onChange={(e) => setFormPendapatanKotor(Number(e.target.value))}
+                          value={formPendapatanKotor}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^[0-9]*$/.test(val)) {
+                              setFormPendapatanKotor(val);
+                            }
+                          }}
                           placeholder="0"
                           className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-200 transition font-mono font-bold"
                         />
@@ -3077,11 +3085,15 @@ export default function App() {
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Gaji Operator (Rp)</label>
                         <input
-                          type="number"
+                          type="text"
                           required
-                          min={0}
-                          value={formGajiOperator === 0 ? "" : formGajiOperator}
-                          onChange={(e) => setFormGajiOperator(Number(e.target.value))}
+                          value={formGajiOperator}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^[0-9]*$/.test(val)) {
+                              setFormGajiOperator(val);
+                            }
+                          }}
                           placeholder="0"
                           className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-200 transition font-mono font-bold text-rose-300"
                         />
@@ -3089,11 +3101,15 @@ export default function App() {
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Gaji Helper (Rp)</label>
                         <input
-                          type="number"
+                          type="text"
                           required
-                          min={0}
-                          value={formGajiHelper === 0 ? "" : formGajiHelper}
-                          onChange={(e) => setFormGajiHelper(Number(e.target.value))}
+                          value={formGajiHelper}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "" || /^[0-9]*$/.test(val)) {
+                              setFormGajiHelper(val);
+                            }
+                          }}
                           placeholder="0"
                           className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-200 transition font-mono font-bold text-rose-300"
                         />
@@ -3104,11 +3120,15 @@ export default function App() {
                     <div className="space-y-1">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Potongan Lainnya (Rp)</label>
                       <input
-                        type="number"
+                        type="text"
                         required
-                        min={0}
-                        value={formLainnya === 0 ? "" : formLainnya}
-                        onChange={(e) => setFormLainnya(Number(e.target.value))}
+                        value={formLainnya}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "" || /^[0-9]*$/.test(val)) {
+                            setFormLainnya(val);
+                          }
+                        }}
                         placeholder="0"
                         className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-lg focus:outline-none focus:border-indigo-500 text-slate-200 transition font-mono font-bold text-rose-300"
                       />
@@ -3121,7 +3141,7 @@ export default function App() {
                         <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">Kotor - (Operator + Helper + Lainnya)</span>
                       </div>
                       <span className="text-sm font-black text-emerald-400 font-mono">
-                        {formatIDR(formPendapatanKotor - (formGajiOperator + formGajiHelper + formLainnya))}
+                        {formatIDR(Number(formPendapatanKotor) - (Number(formGajiOperator) + Number(formGajiHelper) + Number(formLainnya)))}
                       </span>
                     </div>
                   </div>
